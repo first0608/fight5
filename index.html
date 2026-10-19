@@ -253,7 +253,7 @@
     <div class="gatesub">ซากเมืองแตกดับ — ใส่ชื่อผู้เล่นเพื่อเริ่มเกม</div>
     <input type="text" id="gateServerInput" placeholder="ลิงก์เซิร์ฟเวอร์ (…/exec)" style="display:none">
     <input type="text" id="gateNameInput" placeholder="ชื่อผู้เล่น">
-    <input type="password" inputmode="numeric" id="gatePinInput" maxlength="8" placeholder="PIN ตัวเลข 4–8 หลัก" style="display:none">
+    <input type="password" id="gatePinInput" maxlength="22" autocomplete="current-password" placeholder="รหัสผ่าน 8–22 ตัว (อังกฤษ/ตัวเลข)" style="display:none">
     <input type="text" id="gateCodeInput" placeholder="โค้ดรับไอเทม (ถ้ามี ไม่ใส่ก็ได้)">
     <button class="primary" onclick="submitGate()">เข้าเกม</button>
   </div>
@@ -671,7 +671,8 @@ async function onlineLogin(){
     if(!ON.apiUrl){ setGateMsg('ใส่ลิงก์เซิร์ฟเวอร์ก่อน', true); return; }
   }
   if(!name){ setGateMsg('ใส่ชื่อผู้เล่นก่อนนะ', true); return; }
-  if(!/^\d{4,8}$/.test(pin)){ setGateMsg('PIN ต้องเป็นตัวเลข 4–8 หลัก', true); return; }
+  if(/[^\x21-\x7E]/.test(pin)){ setGateMsg('รหัสผ่านใช้ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์ (ห้ามภาษาไทย/เว้นวรรค) — ลองเปลี่ยนแป้นพิมพ์เป็นภาษาอังกฤษ', true); return; }
+  if(pin.length<4 || pin.length>22){ setGateMsg('รหัสผ่านต้องยาว 8–22 ตัว', true); return; }
   const btn = document.querySelector('#loginGate button');
   if(btn) btn.disabled = true;
   setGateMsg('กำลังเชื่อมต่อเซิร์ฟเวอร์…');
@@ -689,7 +690,7 @@ async function onlineLogin(){
     document.getElementById('codeInput').value = code;
     await redeemCode();
   }
-  if(r.created) showToast(`สมัครสำเร็จ! จำ PIN ไว้ใช้เข้าเกมครั้งต่อไป`);
+  if(r.created) showToast(`สมัครสำเร็จ! จำรหัสผ่านไว้ใช้เข้าเกมครั้งต่อไป`);
 }
 async function onlineLogout(){
   if(!confirm('ออกจากระบบ?')) return;
@@ -732,7 +733,7 @@ async function bootGame(){
       return;
     }
   }
-  setGateMsg('ใส่ชื่อ + PIN (ชื่อใหม่ = สมัครอัตโนมัติ)');
+  setGateMsg('ใส่ชื่อ + รหัสผ่าน (ชื่อใหม่ = สมัครอัตโนมัติ)');
 }
 
 // ---------- 🎁 รับของที่ GM ส่งมา (จากแผ่นงาน "🎁 ส่งของ" ในชีท) ----------
@@ -1163,7 +1164,7 @@ function renderGuide(){
   if(online){
     secs.push(gSec('💳 เติมเพชร & บัญชีออนไลน์', `
       ซื้อโค้ดเติมเพชรจากแอดมิน แล้วใส่ที่แท็บ 🏪 ตลาด → 💳 เติมเพชร (หรือช่องโค้ดรับไอเทม) โค้ดใช้ได้ครั้งเดียว<br>
-      เข้าเกมด้วยชื่อ + PIN · ข้อมูลบันทึกบนเซิร์ฟเวอร์ เล่นต่อได้ทุกเครื่อง · อย่าเข้าบัญชีเดียวกันพร้อมกัน 2 เครื่อง (ข้อมูลจะทับกัน)`));
+      เข้าเกมด้วยชื่อ + รหัสผ่าน · ข้อมูลบันทึกบนเซิร์ฟเวอร์ เล่นต่อได้ทุกเครื่อง · อย่าเข้าบัญชีเดียวกันพร้อมกัน 2 เครื่อง (ข้อมูลจะทับกัน)`));
   }
   document.getElementById('guideContent').innerHTML = `<div class="panel" style="padding:12px 14px;"><h2 style="margin:0;">📖 คู่มือ FIGHT5</h2>
     <div class="note">กดหัวข้อเพื่ออ่าน — ตัวเลขทั้งหมดดึงจากระบบจริงในเกม</div></div>` + secs.join('');
