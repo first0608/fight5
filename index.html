@@ -1090,6 +1090,7 @@ function renderGuide(){
   secs.push(gSec('🧍 ตัวละคร เลเวล สเตตัส', `
     สเตตัสพื้นฐาน: HP ${BASE_STATS.hp} · ATK ${BASE_STATS.atk} · DEF ${BASE_STATS.defFlat}+${BASE_STATS.defPct}% · SPD ${BASE_STATS.spd} · คริ ${BASE_STATS.crit}% · หลบ ${BASE_STATS.eva}%<br>
     <b>เลเวล:</b> สูงสุด 20 (+5 ต่อ DNA ผู้วิวัฒนาการ 1 ชิ้น) · EXP ที่ต้องใช้ = เลเวล × 100 · ได้ 3 แต้มสเตตัสต่อเลเวล<br>
+    <b>เลเวลอัพได้สเตตัสพื้นฐานเพิ่มเองทุกเลเวล:</b> HP +${LEVEL_GROWTH.hp*100}% · ATK +${LEVEL_GROWTH.atk*100}% · DEF +${LEVEL_GROWTH.def*100}% · SPD +${LEVEL_GROWTH.spd*100}% ของค่าพื้นฐาน (ต่อเลเวล นับจาก Lv.2)<br>
     <b>แจกแต้ม (แต้มละ +${STAT_POINT_VALUE*100}% ของค่าพื้นฐาน):</b>
     ${gTable(['แต้ม','เพิ่ม'],[['VIT','HP'],['STR','ATK'],['AGI','หลบหลีก'],['DEX','DEF'],['LUX','คริติคอล'],['SPD','ความเร็ว (ตีก่อน) + เจาะเกราะ 1% ทุก 4 แต้ม']])}
     <b>เลือดไม่ฟื้นเอง</b> หลังจบไฟต์ ต้องใช้ 🧪 น้ำยาเพิ่มเลือด · ทีมที่ยืนยันแล้วล็อก 3 วัน · ตัวแรกในทีม = แนวหน้า ต้องล้มก่อนศัตรูถึงตีตัวหลังได้`));
@@ -1614,6 +1615,8 @@ async function loadState(){
   // ชิ้นส่วน/อุปกรณ์ที่ผูกกับตัวละครที่ไม่มีอยู่แล้ว → ปลดให้กลับมาเป็นของว่าง
   parts.forEach(p=>{ if(p.equippedTo && !roster.some(r=>r.id===p.equippedTo)) p.equippedTo = null; });
   equipment.forEach(g=>{ if(g.equippedTo && !roster.some(r=>r.id===g.equippedTo)) g.equippedTo = null; });
+  // คำนวณสเตตัสใหม่ทุกตัวตอนโหลด (ตัวละครเดิมจะได้โบนัสสเตตัสตามเลเวลทันที)
+  roster.forEach(c=>{ try{ recomputeStats(c); }catch(e){} });
 
   if(!profile.starterGranted && roster.length===0){
     roster = Object.keys(FACTIONS).map(f => makeStarterCharacter(f));
@@ -1716,6 +1719,9 @@ function makeStarterCharacter(faction){
 }
 // ค่าที่แต้มสเตตัสแต่ละแต้มให้ (สมมติฐาน: +2% ต่อแต้มกับสเตตัสฐานของหมวดนั้น)
 const STAT_POINT_VALUE = 0.02;
+// สเตตัสพื้นฐานที่ได้ฟรีทุกเลเวล (คิดเป็น % ของค่าพื้นฐาน บวกรวมกับแต้มที่แจก) — Lv.1 ยังไม่ได้
+const LEVEL_GROWTH = { hp:0.04, atk:0.04, def:0.04, spd:0.02 };
+function levelGrowth(char){ return Math.max(0, (char.level||1) - 1); }
 function getDNACount(char, dnaId){
   return char.dna.filter(d=>d.id===dnaId).length;
 }
@@ -1736,12 +1742,13 @@ function recomputeStats(char){
   const fulldef = getFulldefBonus(char);
   const fullSet = getFullSetFaction(char);
   const angelSetHpMult = fullSet==='angel' ? 0.9 : 1.0;   // โบนัสชุดครบนางฟ้า: HP สูงสุด -10%
+  const L = levelGrowth(char);
   char.stats = {
-    hp:      Math.round(BASE_STATS.hp*mult*(1+lv.vit*P)*(1+fulldef.hpMultBonus)*angelSetHpMult),
-    atk:     Math.round(BASE_STATS.atk*mult*(1+lv.str*P)),
-    defFlat: Math.round(BASE_STATS.defFlat*mult*(1+lv.dex*P)),
+    hp:      Math.round(BASE_STATS.hp*mult*(1+lv.vit*P+L*LEVEL_GROWTH.hp)*(1+fulldef.hpMultBonus)*angelSetHpMult),
+    atk:     Math.round(BASE_STATS.atk*mult*(1+lv.str*P+L*LEVEL_GROWTH.atk)),
+    defFlat: Math.round(BASE_STATS.defFlat*mult*(1+lv.dex*P+L*LEVEL_GROWTH.def)),
     defPct:  Math.min(55, Math.round(BASE_STATS.defPct*mult)),
-    spd:     Math.round(BASE_STATS.spd*mult*(1+lv.spd*P)),
+    spd:     Math.round(BASE_STATS.spd*mult*(1+lv.spd*P+L*LEVEL_GROWTH.spd)),
     crit:    Math.round(5*(1+lv.lux*P)),
     eva:     Math.round(5*(1+lv.agi*P)),
   };
@@ -3343,9 +3350,15 @@ async function endBattle(result){
     const myFighters = battleUnits.filter(u=>u.side==='me' && !u.isMinion).map(u=>u.char);
     myFighters.forEach(ch=>{
       const pointsBefore = ch.unspentPoints||0;
+      const hpMaxBefore = ch.stats.hp;
       const levelsGained = grantExp(ch, expReward);
       if(levelsGained>0){
         recomputeStats(ch);
+        // เลือดสูงสุดที่เพิ่มจากเลเวลอัพ เติมเข้าเลือดปัจจุบันด้วย (ไม่ฮีลเต็ม)
+        const hpGain = ch.stats.hp - hpMaxBefore;
+        if(hpGain>0 && ch.currentHp>0) ch.currentHp = Math.min(ch.stats.hp, ch.currentHp + hpGain);
+        const bu = battleUnits.find(u=>u.char===ch && !u.isMinion);
+        if(bu && hpGain>0 && bu.curHp>0) bu.curHp = Math.min(ch.stats.hp, bu.curHp + hpGain);
         const pointsGained = (ch.unspentPoints||0) - pointsBefore;
         logLine('sys', `⭐ ${ch.name} ได้ ${expReward} EXP${expBoosted?' (คูณ 2 จากยา)':''} → เลเวลอัพเป็น Lv.${ch.level}! (+${pointsGained} แต้มสเตตัส)`);
       } else {
