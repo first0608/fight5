@@ -3684,8 +3684,8 @@ function closeBattle(){
 //  ทุกอย่างออกแบบให้ "แต่ละ key มีคนเขียนคนเดียว" หรือ "ผลลัพธ์คำนวณได้ตรงกันทุกเครื่อง" เพื่อกันข้อมูลทับกัน
 // =========================================================
 const GUILD_CREATE_COST = 2000;          // ค่าสร้างกิล (เหรียญ)
-const GUILD_MAX_MEMBERS = 20;            // สมาชิกพื้นฐาน (เลเวลกิล 1) — +1 คนต่อเลเวลกิล
-const GUILD_MAX_VICES = 3;               // รองกิลได้สูงสุด 3 คน
+const GUILD_MAX_MEMBERS = 5;             // สมาชิกพื้นฐาน (เลเวลกิล 1) — +1 คนต่อเลเวลกิล
+const GUILD_MAX_VICES = 2;               // รองกิลได้สูงสุด 2 คน
 const GUILD_OBJ_TTL_MS = 3*24*60*60*1000; // ของในคลังกิลอยู่ได้ 3 วัน เกินแล้วกลายเป็น EXP กิล (ตามราคาแต้มของชิ้นนั้น)
 const GUILD_UPG_GROWTH = 1.3;            // ค่า EXP อัปเกรดครั้งถัดไป x1.3
 // อัปเกรดกิล (หัวกิล/รองกิลกดได้) — per = เพิ่มต่อเลเวล, max = เพดาน, base = EXP ครั้งแรก
@@ -3912,7 +3912,24 @@ async function sGetStrict(key){
 }
 async function loadMyGuild(){
   const gid = profile.guildId;
-  const empty = ()=>{ guildState.guild = null; guildState.members = []; guildState.recent = []; guildState.treasury = { dia:0, coin:0, objs:[], pts:{}, exp:0, upg:{} }; };
+  const empty = ()=>{ guildState.guild = null; guildState.members = []; guildState.recent = []; guildState.requests = []; guildState.treasury = { dia:0, coin:0, objs:[], pts:{}, exp:0, upg:{} }; };
+  if(!gid && profile.guildReq && safeId(profile.guildReq.gid)){
+    // มีคำขอค้างอยู่: เช็คว่าได้รับอนุมัติ/ถูกปฏิเสธหรือยัง
+    const req = profile.guildReq;
+    let mem, pending;
+    try{ [mem, pending] = await Promise.all([ sGetStrict(`gmem:${req.gid}:${profile.playerId}`), sGetStrict(`greq:${req.gid}:${profile.playerId}`) ]); }
+    catch(e){ empty(); return; }
+    if(mem){
+      profile.guildId = req.gid; profile.guildReq = null; await saveProfile();
+      showToast(`🏰 ได้รับอนุมัติเข้ากิล "${req.name}" แล้ว!`);
+      return loadMyGuild();
+    }
+    if(!pending){
+      profile.guildReq = null; await saveProfile();
+      showToast(`🏰 คำขอเข้ากิล "${req.name}" ไม่ได้รับอนุมัติ`);
+    }
+    empty(); return;
+  }
   if(!gid){ empty(); return; }
   let g, me;
   try{ [g, me] = await Promise.all([ sGetStrict(`guild:${gid}`), sGetStrict(`gmem:${gid}:${profile.playerId}`) ]); }
@@ -3934,6 +3951,8 @@ async function loadMyGuild(){
   guildState.members = memRows.map(r=>r.val).filter(m=>safeId(m.pid));
   guildState.treasury = treasury;
   guildState.recent = entries.slice(-15).reverse();
+  const canManage = g.ownerId===profile.playerId || (Array.isArray(g.vices) && g.vices.includes(profile.playerId));
+  guildState.requests = canManage ? (await sListGet(`greq:${gid}:`)).map(r=>r.val).filter(x=>x && safeId(x.pid)).sort((a,b)=>a.ts-b.ts) : [];
   if(g.ownerId===profile.playerId && entries.length > GUILD_LEDGER_COMPACT_AT){
     compactLedger(gid, entries, treasury);   // ทำเบื้องหลัง ไม่ต้องรอ
   }
@@ -3941,7 +3960,7 @@ async function loadMyGuild(){
 async function loadGuildList(){
   const [guildRows, memKeys, statRows] = await Promise.all([ sListGet('guild:'), sList('gmem:'), sListGet('gstat:') ]);
   const capBy = {};
-  statRows.forEach(r=>{ const gid = r.key.split(':')[1]; capBy[gid] = Number(r.val.maxMembers)||GUILD_MAX_MEMBERS; });
+  statRows.forEach(r=>{ const gid = r.key.split(':')[1]; const lv = Number(r.val.level)||1; capBy[gid] = GUILD_MAX_MEMBERS + Math.max(0, lv-1); });
   const guilds = guildRows.map(r=>r.val).filter(g=>g && safeId(g.id));
   const countBy = {};
   memKeys.forEach(k=>{ const gid = k.split(':')[1]; countBy[gid] = (countBy[gid]||0)+1; });
@@ -4041,25 +4060,53 @@ async function createGuild(){
     return;
   }
   profile.guildId = gid;
+  if(profile.guildReq){ sDel(`greq:${profile.guildReq.gid}:${profile.playerId}`); profile.guildReq = null; }
   await saveProfile();
   renderHud();
   await refreshGuildData(true);
   showToast(`🏰 สร้างกิล "${name}" สำเร็จ!`);
 }
+// ขอเข้ากิล: ส่งคำขอ แล้วรอหัวกิล/รองกิลกดอนุมัติ (ส่งคำขอได้ทีละ 1 กิล)
 async function joinGuild(gid){
   if(!safeId(gid)) return;
   if(profile.guildId){ showToast('ออกจากกิลเดิมก่อน'); return; }
+  if(profile.guildReq && profile.guildReq.gid){ showToast('มีคำขอที่รออนุมัติอยู่แล้ว ยกเลิกก่อนถึงจะขอกิลอื่นได้'); return; }
   const g = await sGet(`guild:${gid}`);
   if(!g){ showToast('ไม่พบกิลนี้แล้ว'); await refreshGuildData(true); return; }
   const [count, led] = await Promise.all([ sList(`gmem:${gid}:`).then(k=>k.length), loadLedger(gid) ]);
   const cap = guildMaxMembersFor(led.treasury.upg);
   if(count >= cap){ showToast(`กิลนี้เต็มแล้ว (${cap} คน)`); return; }
-  const ok = await sSet(`gmem:${gid}:${profile.playerId}`, { pid:profile.playerId, name:profile.playerName, joinedAt:Date.now() });
-  if(!ok){ showToast('เข้ากิลไม่สำเร็จ ลองใหม่อีกครั้ง'); return; }
-  profile.guildId = gid;
+  const ok = await sSet(`greq:${gid}:${profile.playerId}`, { pid:profile.playerId, name:profile.playerName, ts:Date.now() });
+  if(!ok){ showToast('ส่งคำขอไม่สำเร็จ ลองใหม่อีกครั้ง'); return; }
+  profile.guildReq = { gid, name:g.name, ts:Date.now() };
   await saveProfile();
+  renderGuildTab();
+  showToast(`ส่งคำขอเข้ากิล "${g.name}" แล้ว รอหัวกิล/รองกิลอนุมัติ`);
+}
+async function cancelGuildRequest(){
+  const req = profile.guildReq; if(!req) return;
+  await sDel(`greq:${req.gid}:${profile.playerId}`);
+  profile.guildReq = null;
+  await saveProfile();
+  renderGuildTab();
+  showToast('ยกเลิกคำขอเข้ากิลแล้ว');
+}
+// หัวกิล/รองกิล: อนุมัติหรือปฏิเสธคำขอ
+async function answerGuildRequest(pid, approve){
+  if(!canManageGuild() || !safeId(pid)) return;
+  const gid = profile.guildId;
+  const req = await sGet(`greq:${gid}:${pid}`);
+  if(!req){ showToast('คำขอนี้ถูกยกเลิกไปแล้ว'); await refreshGuildData(true); return; }
+  if(approve){
+    const [count, led] = await Promise.all([ sList(`gmem:${gid}:`).then(k=>k.length), loadLedger(gid) ]);
+    const cap = guildMaxMembersFor(led.treasury.upg);
+    if(count >= cap){ showToast(`กิลเต็มแล้ว (${cap} คน) — อัปเลเวลกิลเพื่อเพิ่มที่ว่าง`); return; }
+    const ok = await sSet(`gmem:${gid}:${pid}`, { pid, name:req.name, joinedAt:Date.now(), approvedBy:profile.playerName });
+    if(!ok){ showToast('อนุมัติไม่สำเร็จ ลองใหม่อีกครั้ง'); return; }
+  }
+  await sDel(`greq:${gid}:${pid}`);
   await refreshGuildData(true);
-  showToast(`เข้าร่วมกิล "${g.name}" แล้ว!`);
+  showToast(approve ? `รับ ${req.name} เข้ากิลแล้ว` : `ปฏิเสธคำขอของ ${req.name} แล้ว`);
 }
 async function leaveGuild(){
   if(!profile.guildId) return;
@@ -4625,6 +4672,13 @@ function renderMyGuildPanel(){
       <div style="font-size:12px;font-weight:700;margin:10px 0 4px 0;">🧬 บริจาคแพ็ค DNA <span class="note">(D/C/B ${GUILD_DNA_DONATE_PTS.D} · A ${GUILD_DNA_DONATE_PTS.A} · S ${GUILD_DNA_DONATE_PTS.S} · SS ${GUILD_DNA_DONATE_PTS.SS} · SSS ${GUILD_DNA_DONATE_PTS.SSS} แต้ม)</span></div>
       ${donateDnaHtml}
     </div>
+    ${canManageGuild() ? `<div class="panel">
+      <h2>📥 คำขอเข้ากิล (${(guildState.requests||[]).length})</h2>
+      <div class="note" style="margin-top:0;">หัวกิลและรองกิลกดอนุมัติได้ · สมาชิก ${members.length}/${guildMaxMembersFor(t.upg)} คน</div>
+      ${(guildState.requests||[]).length ? guildState.requests.map(r=>`<div class="part-pick-item"><div>${esc(r.name)}<div class="note" style="margin:0;">ขอเมื่อ ${new Date(r.ts).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</div></div>
+        <div style="display:flex;gap:4px;"><button class="primary" ${members.length>=guildMaxMembersFor(t.upg)?'disabled':''} onclick="answerGuildRequest('${esc(r.pid)}', true)">อนุมัติ</button><button class="ghost" onclick="answerGuildRequest('${esc(r.pid)}', false)">ปฏิเสธ</button></div></div>`).join('')
+        : '<div class="note">ยังไม่มีคำขอ</div>'}
+    </div>` : ''}
     <div class="panel">
       <h2>👥 สมาชิก</h2>
       ${members.map(m=>{ const isVice = Array.isArray(g.vices) && g.vices.includes(m.pid);
@@ -4653,11 +4707,13 @@ function renderNoGuildPanel(){
     </div>
     <div class="panel">
       <h2>🔎 เข้าร่วมกิล</h2>
+      <div class="note" style="margin-top:0;">ส่งคำขอแล้วรอหัวกิล/รองกิลอนุมัติ (ขอได้ทีละ 1 กิล)</div>
+      ${profile.guildReq ? `<div class="part-pick-item" style="border-color:var(--accent)"><div>⏳ รออนุมัติเข้ากิล <b>${esc(profile.guildReq.name)}</b></div><button class="ghost" onclick="cancelGuildRequest()">ยกเลิกคำขอ</button></div>` : ''}
       ${list.length ? list.map(({guild:g, memberCount, cap})=>{
         const owned = WAR_ZONES.filter(z=> guildState.zoneOwners[z] && guildState.zoneOwners[z].gid===g.id).map(zoneName);
         return `<div class="part-pick-item"><div><b>${esc(g.name)}</b>
             <div class="note" style="margin:0;">หัวหน้า ${esc(g.ownerName)} · ${memberCount}/${cap} คน${owned.length?` · 👑 ${esc(owned.join(', '))}`:''}</div></div>
-          <button class="primary" ${memberCount>=cap?'disabled':''} onclick="joinGuild('${esc(g.id)}')">${memberCount>=cap?'เต็ม':'เข้าร่วม'}</button></div>`;
+          <button class="primary" ${(memberCount>=cap || profile.guildReq)?'disabled':''} onclick="joinGuild('${esc(g.id)}')">${memberCount>=cap?'เต็ม':(profile.guildReq && profile.guildReq.gid===g.id)?'รออนุมัติ':'ขอเข้าร่วม'}</button></div>`;
       }).join('') : '<div class="empty-msg" style="padding:14px;">ยังไม่มีกิลในเซิร์ฟเวอร์ — สร้างกิลแรกเลย!</div>'}
     </div>`;
 }
@@ -4861,7 +4917,7 @@ async function onlineTick(){
     }
   } finally { __tickBusy = false; }
 }
-function fmtLeft(ms){
+function lbFmtLeft(ms){
   ms = Math.max(0, ms); const m = Math.floor(ms/60000);
   if(m >= 1440) return `${Math.floor(m/1440)} วัน ${Math.floor((m%1440)/60)} ชม.`;
   if(m >= 60) return `${Math.floor(m/60)} ชม. ${m%60} นาที`;
@@ -4891,7 +4947,7 @@ function renderRank(){
   else {
     const left = d.endsAt - (d.now + (Date.now() - d._at));
     const head = lbView.prev ? `<div class="note">รอบที่จบแล้ว — อันดับ 1–10 ได้รางวัลเข้าบัญชีอัตโนมัติ</div>`
-      : `<div class="note">รอบนี้จบในอีก <b>${fmtLeft(left)}</b> · ผู้ร่วมล่า ${d.total} คน</div>`;
+      : `<div class="note">รอบนี้จบในอีก <b>${lbFmtLeft(left)}</b> · ผู้ร่วมล่า ${d.total} คน</div>`;
     const me = d.me ? `<div class="part-pick-item" style="border-color:var(--accent)"><div>👤 อันดับของคุณ: <b>#${d.me.rank}</b> · ${d.me.p} คะแนน</div></div>`
       : `<div class="note">คุณยังไม่มีคะแนนในรอบนี้</div>`;
     const list = d.top.length ? d.top.map((x,i)=>{
@@ -4966,7 +5022,7 @@ async function mktLoad(){
   mkt.loading = true; mkt.err=''; renderP2PMarket();
   try{
     const r = await onlineRpc({ a:'mktBrowse', t:ON.token });
-    if(r && r.ok){ mkt.list = r.list; mkt.serverAllowed = !!r.allowed; }
+    if(r && r.ok){ mkt.list = r.list; mkt.serverAllowed = !!r.allowed; mkt.slots = r.slots || null; }
     else mkt.err = (r && r.error) || 'โหลดตลาดไม่สำเร็จ';
   } catch(e){ mkt.err = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'; }
   mkt.loading = false; renderP2PMarket();
@@ -4997,11 +5053,22 @@ function renderP2PMarket(){
                  : `<button class="diamond" onclick="mktBuy('${x.id}', ${x.price})" ${(!allowed||profile.diamonds<x.price)?'disabled':''}>ซื้อ · ${x.price.toLocaleString()}💎</button>`}
       </div>`).join('') : `<div class="empty-msg">ยังไม่มีสินค้าในหมวดนี้</div>`;
   }
+  const sl = mkt.slots;
+  const full = sl && sl.used >= sl.limit;
+  const fmtD = t=>{ const d=new Date(t+7*3600000); return `${d.getUTCDate()}/${d.getUTCMonth()+1} ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`; };
+  const slotBox = (allowed && sl) ? `<div class="part-pick-item" style="flex-wrap:wrap;gap:6px;">
+      <div style="flex:1 1 100%;">📋 ช่องประกาศขาย <b>${sl.used}/${sl.limit}</b> (ฟรี ${sl.free} ช่อง${sl.monthUntil?` + เหมาเดือน ${sl.maxExtra} ช่อง ถึง ${fmtD(sl.monthUntil)}`:sl.rented.length?` + เช่า ${sl.rented.length} ช่อง`:''})
+        ${!sl.monthUntil && sl.rented.length ? `<div class="note" style="margin:2px 0 0;">ช่องเช่าหมดอายุ: ${sl.rented.map(fmtD).join(' · ')}</div>` : ''}
+        <div class="note" style="margin:2px 0 0;">เช่าเพิ่มทีละช่อง 7 วัน: 50 / 100 / 200 / 250 / 250💎 (สูงสุด +${sl.maxExtra}) · เหมาเดือน ${sl.monthPrice}💎 ได้ +${sl.maxExtra} ช่อง 30 วัน</div></div>
+      ${sl.nextPrice!=null ? `<button class="diamond" onclick="mktRent('slot', ${sl.nextPrice})" ${profile.diamonds<sl.nextPrice?'disabled':''}>เช่า +1 ช่อง · ${sl.nextPrice}💎</button>` : ''}
+      <button class="diamond" onclick="mktRent('month', ${sl.monthPrice})" ${profile.diamonds<sl.monthPrice?'disabled':''}>${sl.monthUntil?'ต่อเหมาเดือน':'เหมาเดือน'} · ${sl.monthPrice}💎</button>
+    </div>` : '';
   el.innerHTML = `<h2>🏪 ตลาดผู้เล่น</h2>
-    <div class="note">ซื้อขายด้วยเพชรเท่านั้น · ผู้ขายเสียภาษี ${MKT_TAX_PCT}% ของราคาขาย · ลงขายพร้อมกันได้ 20 รายการ · ของ/เพชรที่ได้จะเข้าบัญชีอัตโนมัติ</div>
+    <div class="note">ซื้อขายด้วยเพชรเท่านั้น · ผู้ขายเสียภาษี ${MKT_TAX_PCT}% ของราคาขาย · ของ/เพชรที่ได้จะเข้าบัญชีอัตโนมัติ</div>
     ${gate}
+    ${slotBox}
     <div class="row" style="margin:8px 0;">
-      <button class="primary" onclick="mktOpenSell()" ${allowed?'':'disabled'}>➕ ลงขายของ</button>
+      <button class="primary" onclick="mktOpenSell()" ${allowed && !full?'':'disabled'}>${full?'ช่องขายเต็ม':'➕ ลงขายของ'}</button>
       <button class="ghost" style="flex:0 0 auto;" onclick="mktLoad()">🔄</button>
     </div>
     <div style="margin-bottom:6px;">${chips}</div>
@@ -5015,6 +5082,15 @@ async function mktUnlock(){
   ON.mktUnlocked = true;
   await saveProfile(); onlineFlush(); renderAll(); renderP2PMarket();
   showToast('ปลดล็อกตลาดผู้เล่นแล้ว!');
+}
+async function mktRent(kind, price){
+  if(profile.diamonds < price){ showToast('เพชรไม่พอ'); return; }
+  let r; try{ r = await onlineRpc({ a:'mktRent', t:ON.token, kind, price }); } catch(e){ showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); return; }
+  if(!r || !r.ok){ showToast((r&&r.error)||'เช่าช่องไม่สำเร็จ'); mktLoad(); return; }
+  profile.diamonds -= r.cost;
+  mkt.slots = r.slots;
+  await saveProfile(); onlineFlush(); renderAll(); renderP2PMarket();
+  showToast(kind==='month' ? `เหมาช่องขายรายเดือนแล้ว -${r.cost}💎` : `เช่าช่องขายเพิ่ม 1 ช่อง (7 วัน) -${r.cost}💎`);
 }
 async function mktBuy(id, price){
   if(!mktAllowed() && !mkt.serverAllowed){ showToast('ต้องปลดล็อกตลาดก่อน'); return; }
@@ -5163,6 +5239,7 @@ openMoneyBox = guardAsync(openMoneyBox);
 vaultDeposit = guardAsync(vaultDeposit);
 vaultWithdraw = guardAsync(vaultWithdraw);
 mktUnlock = guardAsync(mktUnlock);
+mktRent = guardAsync(mktRent);
 mktBuy = guardAsync(mktBuy);
 mktCancel = guardAsync(mktCancel);
 mktSell = guardAsync(mktSell);
@@ -5179,6 +5256,8 @@ confirmTeam = guardAsync(confirmTeam);
 // ระบบกิล
 createGuild = guardAsync(createGuild);
 joinGuild = guardAsync(joinGuild);
+cancelGuildRequest = guardAsync(cancelGuildRequest);
+answerGuildRequest = guardAsync(answerGuildRequest);
 leaveGuild = guardAsync(leaveGuild);
 disbandGuild = guardAsync(disbandGuild);
 kickMember = guardAsync(kickMember);
