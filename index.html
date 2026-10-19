@@ -406,6 +406,7 @@
         <div class="row" style="margin-top:10px;">
           <button class="primary" id="btnStep" onclick="battleStep()">ตีต่อ ▶</button>
           <button class="ghost" id="btnAuto" onclick="toggleAutoBattle()">อัตโนมัติ</button>
+          <button class="diamond" id="btnInstant" onclick="instantBattle()" title="แพ็ค VIP">⚡ จบทันที</button>
           <button class="ghost" onclick="closeBattle()">ออก</button>
         </div>
       </div>
@@ -458,6 +459,7 @@
           <button class="primary" onclick="buyPipeMap()" id="pipeMapBtn">ซื้อบัตร · 3000🪙</button>
         </div>
       </div>
+      <div class="panel" id="vipPanel"></div>
       <div class="panel" id="p2pMarket"></div>
     </div>
 
@@ -1130,7 +1132,10 @@ function renderGuide(){
     ระหว่างต่อสู้ใช้ไอเทมและฝากของไม่ได้`));
 
   secs.push(gSec('🗺️ ด่านและการต่อสู้', `
-    ${gTable(['ด่าน','ศัตรู','⚡','เฟส','เหรียญ','EXP'], Object.values(STAGES).map(st=>[st.name, st.isBoss?'บอส':st.grades.join('–'), st.staminaCost, st.phases, st.isBoss?'-':`${st.coinRange[0]}–${st.coinRange[1]}`, st.expReward]))}
+    ${gTable(['ด่าน','เลเวลมอน','ศัตรู','⚡','เฟส','เหรียญ','EXP'], Object.entries(STAGES).map(([k,st])=>[st.name, stageLvText(k), st.isBoss?'บอส':st.grades.join('–'), st.staminaCost, st.phases, st.isBoss?'-':`${st.coinRange[0]}–${st.coinRange[1]}`, st.expReward]))}
+    • มอนสเตอร์มีเลเวลตามด่าน สเตตัสโตต่อเลเวล HP +${ENEMY_LV_GROWTH.hp*100}% · ATK +${ENEMY_LV_GROWTH.atk*100}% · DEF +${ENEMY_LV_GROWTH.def*100}% · SPD +${ENEMY_LV_GROWTH.spd*100}%<br>
+    • ตัวละครเลเวลเกินมอนสูงสุดของด่านเกิน ${EXP_OVERLEVEL_FREE} เลเวล ได้ EXP ลดลง ${EXP_OVERLEVEL_STEP*100}% ต่อเลเวล (เหลืออย่างน้อย 10%)<br>
+    • 👑 แพ็ค VIP (${VIP_PRICE}💎/${VIP_DAYS} วัน): ปุ่ม ⚡ จบทันที คำนวณการต่อสู้จนจบในครั้งเดียว<br>
     • ทุกรอบเรียงลำดับตาม SPD สูงตีก่อน · ด่านหลายเฟส ต้องชนะครบทุกเฟสถึงได้รางวัล (เลือดต่อเนื่อง)<br>
     • คริติคอลสูงสุด 70% (เกินจะเพิ่มแรงคริแทน) · หลบสูงสุด 70% (เกินจะสวนกลับ) · DEF% สูงสุด 80% (เกินจะสะท้อนดาเมจ)<br>
     • พิษ: เสียเลือดตามเปอร์เซ็นต์ทุกเทิร์น และ ATK -10% ระหว่างติดพิษ<br>
@@ -1816,17 +1821,24 @@ function grantExp(char, amount){
 }
 
 // ตัวละครฝั่ง AI เท่านั้น: ยังใช้เกรดคุมสเตตัสแบบเดิมเพื่อความง่ายในการปรับความยาก
-function makeEnemyChar(faction, grade){
+// เลเวลมอนสเตอร์: แต่ละด่านมีช่วงเลเวลคงที่ (สุ่มในช่วงทุกตัว) — สเตตัสโตตามเลเวล (รวมแต้มจำลองแล้ว)
+const STAGE_LEVELS = { hospital:[1,5], school:[5,10], campground:[10,15], ruins:[15,20], pipe:[25,25] };
+const ENEMY_LV_GROWTH = { hp:0.025, atk:0.02, def:0.02, spd:0.01 };   // ต่อเลเวล (จูนจากการจำลองการต่อสู้)
+const EXP_OVERLEVEL_FREE = 5;      // เลเวลเกินมอนสูงสุดของด่านได้ 5 เลเวลโดยไม่ลด EXP
+const EXP_OVERLEVEL_STEP = 0.15;   // เกินจากนั้น ลด EXP 15% ต่อเลเวล (เหลืออย่างน้อย 10%)
+function rollStageLevel(diff){ const r = STAGE_LEVELS[diff] || [1,1]; return r[0] + Math.floor(Math.random()*(r[1]-r[0]+1)); }
+function makeEnemyChar(faction, grade, level=1){
   const mult = GRADES[grade].mult;
+  const L = Math.max(0, level-1), G = ENEMY_LV_GROWTH;
   return {
     id:newId(),
     name:randName(faction),
     faction, grade,
-    level:1, exp:0,
+    level, exp:0,
     stats:{
-      hp:Math.round(100*mult), atk:Math.round(20*mult),
-      defFlat:Math.round(8*mult), defPct:Math.min(55, Math.round(10*mult)),
-      spd:Math.round(10*mult), crit:5, eva:5
+      hp:Math.round(100*mult*(1+L*G.hp)), atk:Math.round(20*mult*(1+L*G.atk)),
+      defFlat:Math.round(8*mult*(1+L*G.def)), defPct:Math.min(55, Math.round(10*mult)),
+      spd:Math.round(10*mult*(1+L*G.spd)), crit:5, eva:5
     },
     dna:[],
     createdAt:Date.now(),
@@ -2072,7 +2084,7 @@ function renderRoster(){
     el.addEventListener('click', ()=> openDetail(el.dataset.id));
   });
 }
-function renderAll(){ renderHud(); renderRoster(); renderBag(); renderDNATab(); renderShop(); renderGuildTab(); renderVault(); if(document.getElementById('p2pMarket') && mkt.list) renderP2PMarket(); }
+function renderAll(){ renderHud(); renderRoster(); renderBag(); renderDNATab(); renderShop(); renderGuildTab(); renderVault(); renderVipPanel(); if(document.getElementById('p2pMarket') && mkt.list) renderP2PMarket(); }
 
 function dnaPkgCardHtml(pkg){
   return `<div class="part-pick-item">
@@ -2846,7 +2858,7 @@ const PIPE_MAP_COST = 3000; // ราคาบัตรลงด่านท่�
 function makeBossZombie(){
   return {
     id:newId(), name:'ซอมบี้ต้นแบบ', faction:'zombie', grade:'SSS',
-    level:1, exp:0,
+    level:STAGE_LEVELS.pipe[0], exp:0,
     stats:{ hp:2000, atk:70, defFlat:30, defPct:20, spd:10, crit:20, eva:20 },
     dna:[], createdAt:Date.now(),
   };
@@ -2861,6 +2873,7 @@ async function buyPipeMap(){
   renderStageGrid();
   showToast(`🎫 ซื้อบัตรลงด่านท่อน้ำแล้ว! มีอยู่ ${profile.pipeTickets} ใบ`);
 }
+function stageLvText(key){ const r = STAGE_LEVELS[key]; return r ? (r[0]===r[1] ? `Lv.${r[0]}` : `Lv.${r[0]}–${r[1]}`) : ''; }
 function renderStageGrid(){
   const grid = document.getElementById('stageGrid');
   if(!grid) return;
@@ -2877,7 +2890,7 @@ function renderStageGrid(){
     return `
     <div class="stage-card" style="background-image:url(${SCENES[st.scene]})" onclick="startBattle('${key}')">
       ${ownerTag}
-      <div class="stage-sub">⚡${st.staminaCost} · ${st.isBoss ? `บอส · 🎫 ${profile.pipeTickets} ใบ` : st.grades[0]+'–'+st.grades[st.grades.length-1]}</div>
+      <div class="stage-sub">⚡${st.staminaCost} · ${stageLvText(key)} · ${st.isBoss ? `บอส · 🎫 ${profile.pipeTickets} ใบ` : st.grades[0]+'–'+st.grades[st.grades.length-1]}</div>
       <div class="stage-label">${st.name}</div>
     </div>`;
   }).join('');
@@ -2889,7 +2902,7 @@ function makeEnemyTeam(diff){
   const team = [];
   for(let i=0;i<3;i++){
     const grade = pool[Math.floor(Math.random()*pool.length)];
-    team.push(makeEnemyChar(randomFaction(), grade));
+    team.push(makeEnemyChar(randomFaction(), grade, rollStageLevel(diff)));
   }
   return team;
 }
@@ -3039,7 +3052,7 @@ function unitCardHtml(u){
   return `<div class="bunit ${u.alive?'':'dead'} ${isFront&&u.alive?'front':''}" data-uid="${u.char.id}-${u.side}">
     <img src="${sprite}">
     <div class="binfo">
-      <div class="bname">${FACTIONS[u.char.faction].icon} ${u.char.name} ${(()=>{const g=u.char.grade||u.char.dnaGrade; return g?`<span style="color:${GRADES[g].color}">${g}</span>`:'<span style="color:var(--text-dim)">—</span>';})()}</div>
+      <div class="bname">${FACTIONS[u.char.faction].icon} <span class="note" style="margin:0;">Lv.${u.char.level||1}</span> ${u.char.name} ${(()=>{const g=u.char.grade||u.char.dnaGrade; return g?`<span style="color:${GRADES[g].color}">${g}</span>`:'<span style="color:var(--text-dim)">—</span>';})()}</div>
       <div class="hpbar ${pct<30?'low':''}"><div style="width:${pct}%"></div></div>
     </div>
   </div>`;
@@ -3351,7 +3364,12 @@ async function endBattle(result){
     myFighters.forEach(ch=>{
       const pointsBefore = ch.unspentPoints||0;
       const hpMaxBefore = ch.stats.hp;
-      const levelsGained = grantExp(ch, expReward);
+      const lvRange = STAGE_LEVELS[currentDiff];
+      const over = lvRange ? ch.level - lvRange[1] - EXP_OVERLEVEL_FREE : 0;
+      const expMult = over>0 ? Math.max(0.1, 1 - EXP_OVERLEVEL_STEP*over) : 1;
+      const myExp = Math.max(1, Math.round(expReward * expMult));
+      if(expMult<1) logLine('sys', `📉 ${ch.name} เลเวลสูงกว่าด่านมาก ได้ EXP ${Math.round(expMult*100)}%`);
+      const levelsGained = grantExp(ch, myExp);
       if(levelsGained>0){
         recomputeStats(ch);
         // เลือดสูงสุดที่เพิ่มจากเลเวลอัพ เติมเข้าเลือดปัจจุบันด้วย (ไม่ฮีลเต็ม)
@@ -3360,9 +3378,9 @@ async function endBattle(result){
         const bu = battleUnits.find(u=>u.char===ch && !u.isMinion);
         if(bu && hpGain>0 && bu.curHp>0) bu.curHp = Math.min(ch.stats.hp, bu.curHp + hpGain);
         const pointsGained = (ch.unspentPoints||0) - pointsBefore;
-        logLine('sys', `⭐ ${ch.name} ได้ ${expReward} EXP${expBoosted?' (คูณ 2 จากยา)':''} → เลเวลอัพเป็น Lv.${ch.level}! (+${pointsGained} แต้มสเตตัส)`);
+        logLine('sys', `⭐ ${ch.name} ได้ ${myExp} EXP${expBoosted?' (คูณ 2 จากยา)':''} → เลเวลอัพเป็น Lv.${ch.level}! (+${pointsGained} แต้มสเตตัส)`);
       } else {
-        logLine('sys', `⭐ ${ch.name} ได้ ${expReward} EXP${expBoosted?' (คูณ 2 จากยา)':''}`);
+        logLine('sys', `⭐ ${ch.name} ได้ ${myExp} EXP${expBoosted?' (คูณ 2 จากยา)':''}`);
       }
     });
     if(expBoosted){ profile.expBoostActive = false; logLine('sys', `📖 ยาคูณ EXP ถูกใช้หมดฤทธิ์แล้ว`); }
@@ -4859,6 +4877,39 @@ async function vaultWithdraw(){
 }
 
 // =====================================================================
+// 👑 แพ็ค VIP — 1500 เพชร / 30 วัน · ปุ่ม "⚡ จบทันที" คำนวณการต่อสู้จนจบในครั้งเดียว
+// =====================================================================
+const VIP_PRICE = 1500, VIP_DAYS = 30;
+function isVip(){ return (profile && profile.vipUntil||0) > Date.now(); }
+function fmtThDate(t){ const d=new Date(t+7*3600000); return `${d.getUTCDate()}/${d.getUTCMonth()+1}/${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`; }
+function renderVipPanel(){
+  const el = document.getElementById('vipPanel'); if(!el || !profile) return;
+  const on = isVip();
+  el.innerHTML = `<h2>👑 แพ็ค VIP</h2>
+    <div class="note">ปลดล็อกปุ่ม <b>⚡ จบทันที</b> ในหน้าต่อสู้ — กดปุ๊บคำนวณการต่อสู้จนจบทันที ไม่ต้องรอดูทีละเทิร์น</div>
+    <div class="part-pick-item"><div>${on ? `✅ VIP ใช้งานอยู่ ถึง <b>${fmtThDate(profile.vipUntil)}</b>` : 'ยังไม่ได้เป็น VIP'}<div class="note" style="margin:2px 0 0;">${VIP_PRICE}💎 / ${VIP_DAYS} วัน · ซื้อซ้ำ = ต่ออายุเพิ่ม ${VIP_DAYS} วัน</div></div>
+      <button class="diamond" onclick="buyVip()" ${profile.diamonds<VIP_PRICE?'disabled':''}>${on?'ต่ออายุ':'ซื้อ'} · ${VIP_PRICE}💎</button></div>`;
+  const b = document.getElementById('btnInstant');
+  if(b) b.textContent = on ? '⚡ จบทันที' : '🔒 จบทันที (VIP)';
+}
+async function buyVip(){
+  if(profile.diamonds < VIP_PRICE){ showToast('เพชรไม่พอ'); return; }
+  profile.diamonds -= VIP_PRICE;
+  profile.vipUntil = Math.max(Date.now(), profile.vipUntil||0) + VIP_DAYS*86400000;
+  await saveProfile(); if(isOnlineMode()) onlineFlush();
+  renderAll();
+  showToast(`👑 เป็น VIP ถึง ${fmtThDate(profile.vipUntil)}`);
+}
+function instantBattle(){
+  if(!isVip()){ showToast('ฟังก์ชันนี้สำหรับแพ็ค VIP — ซื้อได้ที่แท็บ 🏪 ตลาด'); return; }
+  if(!battleActive || battleOver) return;
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  autoOn = false; document.getElementById('btnAuto').textContent = 'อัตโนมัติ';
+  let n = 0;
+  while(!battleOver && n < 20000){ battleStep(); n++; }
+}
+
+// =====================================================================
 // 📦 กล่องเก็บเงิน — ซื้อ 100 เพชร เปิดได้ 5,000 เหรียญ (ขายในตลาดผู้เล่นได้)
 // =====================================================================
 const MONEY_BOX_COINS = 5000;
@@ -5249,6 +5300,7 @@ useExpPotion = guardAsync(useExpPotion);
 useDropPotion = guardAsync(useDropPotion);
 buyPipeMap = guardAsync(buyPipeMap);
 openMoneyBox = guardAsync(openMoneyBox);
+buyVip = guardAsync(buyVip);
 vaultDeposit = guardAsync(vaultDeposit);
 vaultWithdraw = guardAsync(vaultWithdraw);
 mktUnlock = guardAsync(mktUnlock);
