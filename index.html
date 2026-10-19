@@ -64,6 +64,18 @@
     margin-right:auto;
   }
 
+  /* ---- แถบเลือดทีม (เรียลไทม์) ---- */
+  #teamHpBar{ display:none; gap:6px; padding:6px 10px; background:var(--bg-1); border-bottom:1px solid var(--line); flex-shrink:0; align-items:stretch; }
+  #teamHpBar .thp{ flex:1; min-width:0; font-size:10px; line-height:1.25; }
+  #teamHpBar .thp-n{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text); }
+  #teamHpBar .thp-v{ color:var(--muted, #9ab0a2); font-variant-numeric:tabular-nums; }
+  #teamHpBar .thp.dead .thp-v{ color:var(--bad); }
+  #teamHpBar .hpbar{ margin-top:2px; }
+  #teamHpBar .thp-heal{ flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:14px; cursor:pointer;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:0 8px; }
+  #teamHpBar .thp-heal span{ font-size:10px; font-weight:700; }
+  .ccard .chp{ font-size:9px; color:var(--muted, #9ab0a2); text-align:center; font-variant-numeric:tabular-nums; }
+
   /* ---- tab content ---- */
   #content{ flex:1; overflow-y:auto; padding:14px 12px 90px 12px; }
   .screen{ display:none; animation:fadein .18s ease; }
@@ -86,7 +98,7 @@
   button:disabled{ opacity:0.45; cursor:not-allowed; transform:none;}
   button.ghost{ background:transparent; }
 
-  input[type=text], input[type=password]{
+  input[type=text], input[type=password], input[type=number]{
     font-family:inherit; background:var(--bg-2); border:1px solid var(--line); border-radius:8px;
     color:var(--text); padding:9px 10px; font-size:13px; width:100%;
   }
@@ -268,6 +280,7 @@
     <div class="stat diamond">💎 <span id="hudDiamond">0</span></div>
     <div class="stat stamina">⚡ <span id="hudStamina">0/0</span></div>
   </div>
+  <div id="teamHpBar" onclick="if(event.target.closest('.thp-heal')||event.target.closest('.thp')) openHealPicker()"></div>
 
   <div id="content">
 
@@ -341,6 +354,7 @@
     <div class="screen" data-screen="bag">
       <div class="panel">
         <h2>🦴 ชิ้นส่วนอวัยวะ (<span id="partsCount">0</span>/15)</h2>
+        <div class="note" style="margin-top:0;">นับเฉพาะชิ้นที่ยังไม่ได้ใส่ — ชิ้นที่ใส่อยู่กับตัวละครไม่กินช่อง</div>
         <div class="note" style="margin-top:0;">🔪 ชำแหละ: เสีย 200🪙 ต่อครั้ง (จ่ายแม้ไม่สำเร็จ) ชิ้นส่วนหายไป มีโอกาส 20% ได้แพ็ค DNA เกรดเดียวกับชิ้นส่วน</div>
         <div id="bagList"></div>
       </div>
@@ -354,6 +368,7 @@
         <div id="bagItemList" style="margin-top:8px;"></div>
         <div id="bagUpgradeBox" style="margin-top:8px;"></div>
       </div>
+      <div class="panel" id="vaultPanel"></div>
       <div class="panel">
         <h2>🔐 ตู้เซฟ (<span id="warehouseCount">0</span>/<span id="warehouseCap">4</span> ชนิด)</h2>
         <div class="note">ของในตู้เซฟปลอดภัย ไม่มีวันถูกดรอปออกไป</div>
@@ -421,6 +436,12 @@
             <button class="primary" style="width:100%;margin-top:6px;" onclick="buyShopItem('exp_potion')">ซื้อ</button>
           </div>
           <div>
+            <div style="text-align:center;">📦</div>
+            <div class="note" style="text-align:center;">กล่องเก็บเงิน (เปิดได้ 5,000🪙)</div>
+            <div class="note" style="text-align:center;">100💎/กล่อง</div>
+            <button class="primary" style="width:100%;margin-top:6px;" onclick="buyShopItem('money_box')">ซื้อ</button>
+          </div>
+          <div>
             <div style="text-align:center;">✨</div>
             <div class="note" style="text-align:center;">น้ำยาคูณดรอป</div>
             <div class="note" style="text-align:center;">100💎/ชิ้น (ไม่จำกัด)</div>
@@ -437,10 +458,7 @@
           <button class="primary" onclick="buyPipeMap()" id="pipeMapBtn">ซื้อบัตร · 3000🪙</button>
         </div>
       </div>
-      <div class="panel">
-        <h2>🏪 ตลาด (ผู้เล่นสู่ผู้เล่น)</h2>
-        <div class="empty-msg">ระบบตลาดผู้เล่นสู่ผู้เล่น (shared storage) กำลังพัฒนาในรอบถัดไป</div>
-      </div>
+      <div class="panel" id="p2pMarket"></div>
     </div>
 
     <!-- 🏰 GUILD -->
@@ -450,10 +468,7 @@
 
     <!-- 🏆 RANKING -->
     <div class="screen" data-screen="rank">
-      <div class="panel">
-        <h2>🏆 อันดับ</h2>
-        <div class="empty-msg">ลีคบอร์ดรายชั่วโมง + อันดับนักสู้สะสม กำลังพัฒนาในรอบถัดไป</div>
-      </div>
+      <div id="rankRoot"></div>
     </div>
 
   </div>
@@ -649,6 +664,7 @@ if(isOnlineMode()){
 
 function onlineApplySession(r){
   ON.token = r.token; ON.pid = r.pid; ON.name = r.name; ON.dev = !!r.dev;
+  ON.createdAt = r.createdAt || 0; ON.mktUnlocked = !!r.mktUnlocked;
   DEV.on = ON.dev;
   ON.priv = r.data || {};
   lsSet('fight5_token', r.token);
@@ -684,7 +700,7 @@ async function onlineLogin(){
   onlineApplySession(r);
   await loadState();
   renderAccountPanel();
-  checkGifts();
+  checkGifts(); onlineTick();
   renderTopupPanel(); loadTopupInfo(true);
   if(code){
     document.getElementById('codeInput').value = code;
@@ -726,7 +742,7 @@ async function bootGame(){
     setGateMsg('กำลังเชื่อมต่อเซิร์ฟเวอร์…');
     try{
       const r = await onlineRpc({a:'resume', t:tok});
-      if(r && r.ok){ onlineApplySession(r); await loadState(); renderAccountPanel(); checkGifts(); renderTopupPanel(); loadTopupInfo(true); return; }
+      if(r && r.ok){ onlineApplySession(r); await loadState(); renderAccountPanel(); checkGifts(); onlineTick(); renderTopupPanel(); loadTopupInfo(true); return; }
       lsDel('fight5_token');
     } catch(e){
       setGateMsg('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองเข้าใหม่อีกครั้ง', true);
@@ -781,7 +797,7 @@ function applyGift(g, lines){
     g.gearSlots.filter(sl=>EQUIPMENT_DEFS[sl]).forEach(sl=>{ equipment.push(makeEquipmentItem(sl)); lines.push(`⚔️ ${EQUIPMENT_DEFS[sl].name}`); });
   }
 }
-setInterval(()=>{ checkGifts(); }, 120000);
+setInterval(()=>{ checkGifts(); onlineTick(); }, 120000);
 
 // ---------- 💳 โค้ดเติมเงิน ----------
 let topupInfo = null, __topupInfoAt = 0;
@@ -1122,6 +1138,7 @@ function renderGuide(){
 
   secs.push(gSec('💀 แพ้ยกทีม (โทษการตาย)', `
     • โอกาส ${DEATH_ITEM_LOSS_CHANCE}% เสียของ ${DEATH_ITEM_LOSS_MIN}–${DEATH_ITEM_LOSS_MAX} ชิ้น จากไอเทมในกระเป๋า / ชิ้นส่วนที่ไม่ได้ใส่ / แพ็ค DNA (ตู้เซฟปลอดภัย)<br>
+    • โอกาส ${DEATH_DIAMOND_DROP_CHANCE}% เพชรตก ${DEATH_DIAMOND_DROP_PCT}% ของเพชรที่พกอยู่ (เพชรในคลังเพชรไม่ตก)<br>
     • โอกาส ${DEATH_EQUIPPED_LOSS_CHANCE}% เสียของที่สวมอยู่ 1 ชิ้น (DNA ที่ติดตั้ง / ชิ้นส่วนที่ใส่ / อุปกรณ์)<br>
     • แพ็ค DNA เก็บในตู้เซฟไม่ได้ จึงเสี่ยงหายเสมอ · DNA ที่ติดตั้งหาย = ตัวละครเสียพาสซีฟทั้งชุด (ถ้าเป็นผู้วิวัฒนาการ เลเวลเดิมคงไว้ แต่เลเวลต่อไม่ได้จนกว่าจะติดใหม่)<br>
     • แพ้ในสงครามกิล ไม่มีโทษการตาย<br>
@@ -1403,6 +1420,8 @@ function makePart(weightKey='partW'){
 
 // ---------- inventory caps ----------
 const PARTS_CAP = 15;
+// ช่องชิ้นส่วนนับเฉพาะชิ้นที่ยังไม่ได้ใส่ (ชิ้นที่ใส่อยู่กับตัวละครไม่กินช่อง)
+function partsInBag(){ return parts.filter(p=>!p.equippedTo || !roster.some(r=>r.id===p.equippedTo)).length; }
 const DNA_CAP = 15;
 const BAG_CAP_BASE = 10;        // กระเป๋า: จำนวน "ชนิด" ไอเทมทั่วไป — ของในนี้เสี่ยงถูกดรอปถ้าแพ้ยกทีม
 const STORAGE_CAP_BASE = 4;     // ตู้เซฟ: เก็บปลอดภัย ไม่มีวันถูกดรอปออกไป — เริ่มต้นแค่ 4 ช่อง ต้องอัพเกรดเอาเพิ่ม
@@ -1421,6 +1440,7 @@ const ITEM_DEFS = {
   oil:              { name:'เสบียง',           icon:'🎒' },
   exp_potion:       { name:'ยาคูณ EXP',        icon:'📖' },
   dropmult_potion:  { name:'น้ำยาคูณดรอป',     icon:'✨' },
+  money_box:        { name:'กล่องเก็บเงิน',     icon:'📦' },
   ore_iron:         { name:'เศษแร่เหล็ก',       icon:null, mat:'ore_iron' },
   log_hardwood:     { name:'ไม้เนื้อแข็ง',      icon:null, mat:'log_hardwood' },
   log_teak:         { name:'ไม้สัก',            icon:null, mat:'log_teak' },
@@ -1591,6 +1611,9 @@ async function loadState(){
   bagItems = it ? JSON.parse(it.value) : {};
   const wh = await safeStorageGet('warehouseItems');
   warehouseItems = wh ? JSON.parse(wh.value) : {};
+  // ชิ้นส่วน/อุปกรณ์ที่ผูกกับตัวละครที่ไม่มีอยู่แล้ว → ปลดให้กลับมาเป็นของว่าง
+  parts.forEach(p=>{ if(p.equippedTo && !roster.some(r=>r.id===p.equippedTo)) p.equippedTo = null; });
+  equipment.forEach(g=>{ if(g.equippedTo && !roster.some(r=>r.id===g.equippedTo)) g.equippedTo = null; });
 
   if(!profile.starterGranted && roster.length===0){
     roster = Object.keys(FACTIONS).map(f => makeStarterCharacter(f));
@@ -1826,7 +1849,7 @@ async function doDNARoll(kind, times){
 
 const PART_ROLL_COST = { coin:{1:100, 10:800}, diamond:{1:25, 10:229} };
 async function doPartRoll(kind, times){
-  if(parts.length + times > PARTS_CAP){ showToast(`คลังชิ้นส่วนเต็ม (สูงสุด ${PARTS_CAP} ชิ้น)`); return; }
+  if(partsInBag() + times > PARTS_CAP){ showToast(`คลังชิ้นส่วนเต็ม (สูงสุด ${PARTS_CAP} ชิ้น)`); return; }
   const cost = PART_ROLL_COST[kind][times];
   const bal = kind==='coin' ? profile.coins : profile.diamonds;
   if(bal < cost){ showToast(kind==='coin' ? 'เหรียญไม่พอ' : 'เพชรไม่พอ'); return; }
@@ -1902,7 +1925,7 @@ async function claimDailyLogin(day){
     gained.push(`กล่องสุ่ม DNA x${r.dnaBoxDiamond}`);
   }
   if(r.partBoxDiamond){
-    for(let i=0;i<r.partBoxDiamond;i++){ if(parts.length<PARTS_CAP) parts.push(makePart('diaW')); }
+    for(let i=0;i<r.partBoxDiamond;i++){ if(partsInBag()<PARTS_CAP) parts.push(makePart('diaW')); }
     gained.push(`กล่องสุ่มอวัยวะ x${r.partBoxDiamond}`);
   }
   if(r.dnaSSFixed){
@@ -1921,7 +1944,7 @@ async function claimDailyLogin(day){
 
 // ---------- shop ----------
 const SHOP_PRICES = { heal_potion:250, oil:1000 };            // ราคาเป็นเหรียญ
-const SHOP_PRICES_DIAMOND = { exp_potion:50, dropmult_potion:100 };  // ราคาเป็นเพชร
+const SHOP_PRICES_DIAMOND = { exp_potion:50, dropmult_potion:100, money_box:100 };  // ราคาเป็นเพชร
 const SHOP_ITEM_QTY = { exp_potion:5 };                         // ซื้อ 1 ครั้ง ได้กี่หน่วย (ค่าเริ่มต้น 1)
 const SUPPLIES_LIMIT_PER_WINDOW = 3;
 const SUPPLIES_WINDOW_MS = 2*60*60*1000;
@@ -2005,6 +2028,7 @@ function renderHud(){
   document.getElementById('hudCoin').textContent = Math.floor(profile.coins);
   document.getElementById('hudDiamond').textContent = Math.floor(profile.diamonds);
   document.getElementById('hudStamina').textContent = profile.stamina+'/'+profile.staminaMax;
+  renderTeamHp();
 }
 function gradeBadge(grade){
   if(!grade) return `<span class="grade-badge" style="background:#3a463f;color:#9ab0a2;">—</span>`;
@@ -2015,7 +2039,7 @@ function characterCardHtml(ch){
   const grade = ch.grade || ch.dnaGrade;
   const hpBar = ch.currentHp!=null ? (()=>{
     const pct = Math.max(0, Math.round(ch.currentHp/ch.stats.hp*100));
-    return `<div class="hpbar ${pct<30?'low':''}" style="margin:2px 4px 0 4px;"><div style="width:${pct}%"></div></div>`;
+    return `<div class="hpbar ${pct<30?'low':''}" style="margin:2px 4px 0 4px;"><div style="width:${pct}%"></div></div><div class="chp">❤️ ${Math.max(0,Math.round(ch.currentHp))}/${Math.round(ch.stats.hp)}</div>`;
   })() : '';
   return `<div class="ccard">
     ${gradeBadge(grade)}
@@ -2041,7 +2065,7 @@ function renderRoster(){
     el.addEventListener('click', ()=> openDetail(el.dataset.id));
   });
 }
-function renderAll(){ renderHud(); renderRoster(); renderBag(); renderDNATab(); renderShop(); renderGuildTab(); }
+function renderAll(){ renderHud(); renderRoster(); renderBag(); renderDNATab(); renderShop(); renderGuildTab(); renderVault(); if(document.getElementById('p2pMarket') && mkt.list) renderP2PMarket(); }
 
 function dnaPkgCardHtml(pkg){
   return `<div class="part-pick-item">
@@ -2438,6 +2462,7 @@ function itemRowHtml(id, qty, location){
     if(id==='oil') actions += `<button onclick="useSupplies()">ใช้</button>`;
     if(id==='exp_potion') actions += `<button onclick="useExpPotion()">ใช้${profile.expBoostActive?' (เปิดอยู่)':''}</button>`;
     if(id==='dropmult_potion') actions += `<button onclick="useDropPotion()">ใช้${profile.dropBoostActive?' (เปิดอยู่)':''}</button>`;
+    if(id==='money_box') actions += `<button onclick="openMoneyBox()">เปิด</button>`;
     actions += `<button class="ghost" onclick="moveItemToWarehouse('${id}')">→ตู้เซฟ</button>`;
   } else {
     actions += `<button class="ghost" onclick="moveItemToBag('${id}')">→กระเป๋า</button>`;
@@ -2445,14 +2470,18 @@ function itemRowHtml(id, qty, location){
   return `<div class="item-row">${iconBox}<div class="item-name">${def.name}</div><div class="item-qty">x${qty}</div>${actions}</div>`;
 }
 function renderBag(){
-  document.getElementById('partsCount').textContent = parts.length;
+  document.getElementById('partsCount').textContent = partsInBag();
   const list = document.getElementById('bagList');
   if(list){
     if(parts.length===0){
       list.innerHTML = `<div class="empty-msg">ยังไม่มีชิ้นส่วนอวัยวะ ไปสุ่มที่แท็บ 🥚 ดูสิ</div>`;
     } else {
-      const sorted = [...parts].sort((a,b)=> GRADE_ORDER.indexOf(b.grade)-GRADE_ORDER.indexOf(a.grade));
-      list.innerHTML = sorted.map(partCardHtml).join('');
+      const byGrade = (a,b)=> GRADE_ORDER.indexOf(b.grade)-GRADE_ORDER.indexOf(a.grade);
+      const isWorn = p=> p.equippedTo && roster.some(r=>r.id===p.equippedTo);
+      const loose = parts.filter(p=>!isWorn(p)).sort(byGrade);
+      const worn = parts.filter(isWorn).sort(byGrade);
+      list.innerHTML = (loose.length ? loose.map(partCardHtml).join('') : `<div class="empty-msg">ไม่มีชิ้นส่วนที่ยังไม่ได้ใส่</div>`)
+        + (worn.length ? `<div class="note" style="margin-top:10px;">🦾 ใส่อยู่กับตัวละคร (${worn.length} ชิ้น · ไม่นับช่อง)</div>` + worn.map(partCardHtml).join('') : '');
     }
   }
   const gearCountEl = document.getElementById('gearCount');
@@ -3011,6 +3040,7 @@ function unitCardHtml(u){
 function renderBattle(){
   document.getElementById('sideMe').innerHTML = battleUnits.filter(u=>u.side==='me').map(unitCardHtml).join('');
   document.getElementById('sideEnemy').innerHTML = battleUnits.filter(u=>u.side==='en').map(unitCardHtml).join('');
+  renderTeamHp();
 }
 
 function flashAttacker(u){
@@ -3204,6 +3234,18 @@ async function sendLootToZoneOwner(obj, label){
   }
 }
 async function applyDeathPenalty(){
+  // 0) เพชรตก: โอกาส DEATH_DIAMOND_DROP_CHANCE% เสีย 10% ของเพชรที่พกอยู่ (เพชรในคลังเพชรไม่ตก)
+  if(profile.diamonds >= 1 && Math.random()*100 < DEATH_DIAMOND_DROP_CHANCE){
+    const lostDia = Math.max(1, Math.floor(profile.diamonds * DEATH_DIAMOND_DROP_PCT / 100));
+    profile.diamonds -= lostDia;
+    await saveProfile();
+    logLine('sys', `💎 เพชรตกหาย ${lostDia} เม็ด! (ฝากเพชรเข้าคลังเพชรในแท็บกระเป๋าเพื่อกันตก)`);
+    const owner = WAR_ZONES.includes(currentDiff) ? guildState.zoneOwners[currentDiff] : null;
+    if(owner && owner.gid && Math.random()*100 < DEATH_LOOT_TO_OWNER_CHANCE){
+      const ok = await addLedger(owner.gid, { t:'loot', pid:profile.playerId, name:profile.playerName, zone:currentDiff, dia:lostDia });
+      if(ok) logLine('sys', `🏰 เพชร ${lostDia} เม็ดตกไปอยู่ในคลังกิล "${esc(owner.gname)}" (ผู้ครองโซน)`);
+    }
+  }
   // 1) 25%: เสียของ 1–3 ชิ้น สุ่มจากไอเทมในกระเป๋า / ชิ้นส่วนที่ไม่ได้ใส่ / แพ็ค DNA (ตู้เซฟปลอดภัย)
   if(Math.random()*100 < ((DEV.on && DEV.forceWornLoss) ? 100 : DEATH_ITEM_LOSS_CHANCE)){
     const n = DEATH_ITEM_LOSS_MIN + Math.floor(Math.random()*(DEATH_ITEM_LOSS_MAX-DEATH_ITEM_LOSS_MIN+1));
@@ -3363,7 +3405,7 @@ async function endBattle(result){
         if(addItem(itemId,1)) dropLines.push(`${ITEM_DEFS[itemId].icon} ${ITEM_DEFS[itemId].name} x1`);
         else dropLines.push(`⚠️ กระเป๋า+คลังเต็มหมด ไม่ได้รับ ${ITEM_DEFS[itemId].name}`);
       } else if(g===2){
-        if(parts.length < PARTS_CAP){
+        if(partsInBag() < PARTS_CAP){
           const p = makePart('partW');
           parts.push(p);
           await saveParts();
@@ -3412,6 +3454,7 @@ async function endBattle(result){
     await applyZoneTax(taxOwner, profile.coins - coinsBeforeReward, profile.diamonds - diaBeforeReward, taxedGear, dropLines);
 
     dropLines.forEach(l => logLine('sys', l));
+    lbRecordWin(currentDiff);
     await saveProfile();
     await saveBagItems();
     await saveWarehouseItems();
@@ -3616,6 +3659,7 @@ function closeBattle(){
   battleActive=false; battleOver=false;
   if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
   autoOn=false;
+  renderTeamHp();
   document.getElementById('btnAuto').textContent='อัตโนมัติ';
   document.getElementById('btnStep').disabled=false;
   document.getElementById('battleSetup').style.display='block';
@@ -3720,7 +3764,9 @@ const WAR_GEAR_DROP = {
 const DEATH_ITEM_LOSS_CHANCE = 25;       // 25% เสียของในกระเป๋า/ชิ้นส่วนที่ไม่ได้ใส่/แพ็ค DNA
 const DEATH_ITEM_LOSS_MIN = 1, DEATH_ITEM_LOSS_MAX = 3;   // ครั้งละ 1–3 ชิ้น
 const DEATH_EQUIPPED_LOSS_CHANCE = 5;    // 5% เสียของที่สวมอยู่ 1 ชิ้น (DNA/อวัยวะ/อุปกรณ์)
-const DEATH_LOOT_TO_OWNER_CHANCE = 60;   // ของที่หาย 60% ไปอยู่คลังกิลผู้ครองโซน (ถ้าโซนมีผู้ครอง)
+const DEATH_LOOT_TO_OWNER_CHANCE = 60;
+const DEATH_DIAMOND_DROP_CHANCE = DEATH_ITEM_LOSS_CHANCE * 2;   // เพชรตกเมื่อแพ้ยกทีม: โอกาสเป็น 2 เท่าของโอกาสเสียของ (= 50%)
+const DEATH_DIAMOND_DROP_PCT = 10;       // ตกครั้งละ 10% ของเพชรที่พกติดตัว (เพชรในคลังเพชรปลอดภัย)   // ของที่หาย 60% ไปอยู่คลังกิลผู้ครองโซน (ถ้าโซนมีผู้ครอง)
 const GUILD_LEDGER_COMPACT_AT = 100;     // รายการบัญชีเกินนี้ เจ้าของกิลจะบีบอัดเป็นยอดสรุปอัตโนมัติ
 
 let guildState = {
@@ -4281,7 +4327,7 @@ async function redeemGuildObj(oid){
   const cost = guildObjPts(o);
   const pts = treasury.pts[profile.playerId] || 0;
   if(pts < cost){ showToast(`แต้มกิลไม่พอ (มี ${pts}/${cost})`); return; }
-  if(o.kind==='part' && parts.length >= PARTS_CAP){ showToast(`คลังชิ้นส่วนเต็ม (${PARTS_CAP})`); return; }
+  if(o.kind==='part' && partsInBag() >= PARTS_CAP){ showToast(`คลังชิ้นส่วนเต็ม (${PARTS_CAP})`); return; }
   if(o.kind==='dna' && dnaPackages.length >= DNA_CAP){ showToast(`คลัง DNA เต็ม (${DNA_CAP})`); return; }
   if(o.kind==='item' && !canAddItem(o.itemId)){ showToast('กระเป๋า+ตู้เซฟเต็ม'); return; }
   const ok = await addLedger(profile.guildId, { t:'redeem', pid:profile.playerId, name:profile.playerName, pts:-cost, objOut:o.oid, what:guildObjName(o) });
@@ -4470,7 +4516,7 @@ function guildEntryText(e){
   }
   if(e.t==='donate') return `🎁 ${n} บริจาค ${num(e.dia)?num(e.dia)+'💎':''}${num(e.coin)?num(e.coin)+'🪙':''}${e.obj?esc(guildObjName(e.obj)):''} (+${num(e.pts)} แต้ม)`;
   if(e.t==='wardrop') return `🎁 ${n} ตีบอส${esc(zoneName(e.zone))} ได้ ${e.obj?esc(guildObjName(e.obj)):'อุปกรณ์'} เข้าคลังกิล`;
-  if(e.t==='loot') return `💀 ${n} พ่ายแพ้ที่${esc(zoneName(e.zone))} — ${e.obj?esc(guildObjName(e.obj)):'ของ'} ตกเข้าคลังกิล`;
+  if(e.t==='loot') return `💀 ${n} พ่ายแพ้ที่${esc(zoneName(e.zone))} — ${e.obj?esc(guildObjName(e.obj)):num(e.dia)?num(e.dia)+'💎':'ของ'} ตกเข้าคลังกิล`;
   if(e.t==='war') return `⚔️ ${n} ตีบอส${esc(zoneName(e.zone))} ${num(e.dmg).toLocaleString()} ดาเมจ (+${num(e.pts)} แต้ม)`;
   if(e.t==='redeem') return `🛒 ${n} แลก ${esc(e.what||'')} (${num(e.pts)} แต้ม)`;
   if(e.t==='upgrade' && GUILD_UPGRADES[e.stat]) return `📈 ${n} อัปเกรด ${GUILD_UPGRADES[e.stat].label} → Lv.${num(e.lv) + (e.stat==='level'?1:0)} (−${num(e.cost).toLocaleString()} EXP)`;
@@ -4667,6 +4713,402 @@ async function initGuildSystem(){
   await refreshGuildData(true);
 }
 
+
+// =====================================================================
+// ❤️ แถบเลือดทีมแบบเรียลไทม์ (ใต้แถบบน) — แตะเพื่อเปิดหน้าใช้น้ำยาเพิ่มเลือด
+// =====================================================================
+function renderTeamHp(){
+  const el = document.getElementById('teamHpBar');
+  if(!el || !profile) return;
+  const ids = profile.lockedTeamIds || [];
+  if(!ids.length){ el.style.display='none'; return; }
+  const live = (typeof battleActive!=='undefined' && battleActive && Array.isArray(battleUnits))
+    ? battleUnits.filter(u=>u.side==='me' && !u.isMinion) : null;
+  const rows = ids.map(id=>{
+    const ch = roster.find(r=>r.id===id); if(!ch) return '';
+    const u = live ? live.find(x=>x.char.id===id) : null;
+    const cur = Math.max(0, Math.round(u ? u.curHp : (ch.currentHp!=null ? ch.currentHp : ch.stats.hp)));
+    const max = Math.round(u ? u.maxHp : ch.stats.hp);
+    const pct = max>0 ? Math.round(cur/max*100) : 0;
+    return `<div class="thp ${cur<=0?'dead':''}">
+      <div class="thp-n">${FACTIONS[ch.faction].icon} ${esc(ch.name.split(' ').pop())}</div>
+      <div class="hpbar ${pct<30?'low':''}"><div style="width:${pct}%"></div></div>
+      <div class="thp-v">${cur<=0?'💀 หมดเลือด':cur+'/'+max}</div>
+    </div>`;
+  }).join('');
+  el.style.display='flex';
+  el.innerHTML = rows + `<div class="thp-heal" title="ใช้น้ำยาเพิ่มเลือด">🧪<span>${totalItemQty('heal_potion')}</span></div>`;
+}
+
+// =====================================================================
+// 🏦 คลังเพชร — ฝาก/ถอนได้อย่างละ 200 เพชรต่อวัน (รีเซ็ต 00:00 น. เวลาไทย) · เพชรในคลังไม่ตกเมื่อตาย
+// =====================================================================
+const VAULT_DAILY_LIMIT = 200;
+function thDayKey(ts){ const d = new Date((ts||Date.now()) + 7*3600000); return d.toISOString().slice(0,10); }
+function getVault(){
+  if(!profile.diaVault) profile.diaVault = { bal:0, day:thDayKey(), dep:0, wd:0 };
+  const v = profile.diaVault;
+  if(v.day !== thDayKey()){ v.day = thDayKey(); v.dep = 0; v.wd = 0; }
+  return v;
+}
+function msToThMidnight(){ const t = Date.now()+7*3600000; return 86400000 - (t % 86400000); }
+function renderVault(){
+  const el = document.getElementById('vaultPanel'); if(!el || !profile) return;
+  const v = getVault();
+  const mins = Math.ceil(msToThMidnight()/60000);
+  el.innerHTML = `<h2>🏦 คลังเพชร</h2>
+    <div class="note">เพชรในคลัง <b>ไม่ตก</b> เมื่อแพ้ยกทีม · ฝากได้วันละ ${VAULT_DAILY_LIMIT} · ถอนได้วันละ ${VAULT_DAILY_LIMIT} · รีเซ็ตโควตาเวลา 00:00 น. (อีก ${Math.floor(mins/60)} ชม. ${mins%60} นาที)</div>
+    <div class="row" style="margin-top:8px;align-items:center;">
+      <div style="font-size:13px;">💎 ในคลัง <b>${Math.floor(v.bal)}</b><div class="note" style="margin:0;">วันนี้ฝากแล้ว ${v.dep}/${VAULT_DAILY_LIMIT} · ถอนแล้ว ${v.wd}/${VAULT_DAILY_LIMIT}</div></div>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <input type="number" id="vaultAmt" min="1" max="${VAULT_DAILY_LIMIT}" placeholder="จำนวนเพชร">
+      <button class="diamond" style="flex:0 0 auto;" onclick="vaultDeposit()">ฝาก</button>
+      <button class="ghost" style="flex:0 0 auto;" onclick="vaultWithdraw()">ถอน</button>
+    </div>`;
+}
+function vaultAmt(){ const n = Math.floor(Number((document.getElementById('vaultAmt')||{}).value)); return n>0 ? n : 0; }
+async function vaultDeposit(){
+  if(battleActive){ showToast('ทำรายการระหว่างต่อสู้ไม่ได้'); return; }
+  const v = getVault(); const n = vaultAmt();
+  if(!n){ showToast('ใส่จำนวนเพชรก่อน'); return; }
+  const left = VAULT_DAILY_LIMIT - v.dep;
+  if(n > left){ showToast(`วันนี้ฝากได้อีก ${left} เพชร`); return; }
+  if(profile.diamonds < n){ showToast('เพชรในตัวไม่พอ'); return; }
+  profile.diamonds -= n; v.bal += n; v.dep += n;
+  await saveProfile(); renderAll(); showToast(`ฝาก ${n} 💎 เข้าคลังแล้ว`);
+}
+async function vaultWithdraw(){
+  if(battleActive){ showToast('ทำรายการระหว่างต่อสู้ไม่ได้'); return; }
+  const v = getVault(); const n = vaultAmt();
+  if(!n){ showToast('ใส่จำนวนเพชรก่อน'); return; }
+  const left = VAULT_DAILY_LIMIT - v.wd;
+  if(n > left){ showToast(`วันนี้ถอนได้อีก ${left} เพชร`); return; }
+  if(v.bal < n){ showToast('เพชรในคลังไม่พอ'); return; }
+  v.bal -= n; v.wd += n; profile.diamonds += n;
+  await saveProfile(); renderAll(); showToast(`ถอน ${n} 💎 จากคลังแล้ว`);
+}
+
+// =====================================================================
+// 📦 กล่องเก็บเงิน — ซื้อ 100 เพชร เปิดได้ 5,000 เหรียญ (ขายในตลาดผู้เล่นได้)
+// =====================================================================
+const MONEY_BOX_COINS = 5000;
+async function openMoneyBox(){
+  if(battleActive){ showToast('ใช้ของระหว่างต่อสู้ไม่ได้'); return; }
+  const ok = await consumeItem('money_box');
+  if(!ok){ showToast('ไม่มีกล่องเก็บเงิน'); return; }
+  profile.coins += MONEY_BOX_COINS;
+  await saveProfile(); renderAll();
+  showToast(`เปิดกล่องเก็บเงิน ได้ ${MONEY_BOX_COINS.toLocaleString()} 🪙`);
+}
+
+// =====================================================================
+// 🏆 ลีดเดอร์บอร์ดการล่า (ชั่วโมง / วัน / สัปดาห์ / เดือน)
+// =====================================================================
+const LB_STAGE_POINTS = { hospital:1, school:2, campground:3, ruins:5, pipe:10 };
+const LB_LABEL = { h:'รายชั่วโมง', d:'รายวัน', w:'รายสัปดาห์', m:'รายเดือน' };
+const LB_REWARD_TABLE = {
+  h: [['1',50,1],['2',25,1],['3–4',10,1],['5–10',5,1]],
+  d: [['1',100,10],['2',50,5],['3–4',50,3],['5–10',10,2]],
+  w: [['1',1000,20],['2',500,10],['3–4',250,5],['5–10',100,3]],
+  m: [['1',2500,30],['2',1500,20],['3–4',1000,10],['5–10',500,5]],
+};
+let lbView = { ty:'h', prev:false, data:null, loading:false, err:'' };
+function lbRecordWin(stageKey){
+  const p = LB_STAGE_POINTS[stageKey];
+  if(!p || !isOnlineMode()) return;
+  profile.lbPending = (profile.lbPending||[]).concat([{ p, ts:Date.now() }]).slice(-300);
+  logLine('sys', `🏆 ได้ ${p} คะแนนลีดเดอร์บอร์ดการล่า`);
+  clearTimeout(lbRecordWin._t);
+  lbRecordWin._t = setTimeout(()=>onlineTick(), 20000);
+}
+// ส่งคะแนน + รับรางวัลอันดับ + รับของ/เพชรจากตลาด (ทำงานพร้อมกับเช็คของขวัญทุก 2 นาที)
+let __tickBusy = false;
+async function onlineTick(){
+  if(!isOnlineMode() || !ON.token || !profile || __tickBusy) return;
+  __tickBusy = true;
+  try{
+    const sending = (profile.lbPending||[]).slice();
+    let r;
+    try{ r = await onlineRpc({ a:'tick', t:ON.token, add:sending }); } catch(e){ return; }
+    if(!r || !r.ok){ if(r && r.auth) onlineSessionExpired(); return; }
+    profile.lbPending = (profile.lbPending||[]).slice(sending.length);
+    const lines = [];
+    (r.rewards||[]).forEach(w=>{
+      profile.diamonds += w.dia;
+      let oilTxt = `🎒 เสบียง x${w.oil}`;
+      if(!addItem('oil', w.oil)){ profile.stamina += 5*w.oil; oilTxt = `⚡ พลังฟาร์ม +${5*w.oil} (กระเป๋า/ตู้เซฟเต็ม เลยแปลงเสบียงเป็นพลังฟาร์ม)`; }
+      lines.push(`🏆 อันดับ ${w.rank} ${LB_LABEL[w.ty]} (${w.p} คะแนน) → 💎 ${w.dia} · ${oilTxt}`);
+    });
+    (r.proceeds||[]).forEach(x=>{
+      profile.diamonds += x.dia;
+      lines.push(`💰 ขาย ${mktItemLabel(x.item)} ให้ ${esc(x.buyer)} ได้ 💎 ${x.dia} (ราคา ${x.price} หักภาษี ${MKT_TAX_PCT}%)`);
+    });
+    (r.deliveries||[]).forEach(d=>{
+      const label = mktItemLabel(d.item);
+      mktReceiveItem(d.item);
+      lines.push(d.why==='cancel' ? `↩️ ยกเลิกขาย ได้ ${label} คืน` : `🛒 ได้รับ ${label} (ซื้อจาก ${esc(d.from)})`);
+    });
+    await saveProfile();
+    if(lines.length){
+      await saveBagItems(); await saveWarehouseItems(); await saveParts(); await saveEquipment(); await saveDNAPackages();
+      onlineFlush();
+      renderAll();
+      document.getElementById('giftContent').innerHTML = `<div class="panel"><h2>📬 ได้รับของ</h2>
+        ${lines.map(l=>`<div class="part-pick-item"><div>${l}</div></div>`).join('')}</div>`;
+      document.getElementById('giftOverlay').classList.add('show');
+      if(document.querySelector('.screen.active[data-screen="market"]')) mktLoad();
+    }
+  } finally { __tickBusy = false; }
+}
+function fmtLeft(ms){
+  ms = Math.max(0, ms); const m = Math.floor(ms/60000);
+  if(m >= 1440) return `${Math.floor(m/1440)} วัน ${Math.floor((m%1440)/60)} ชม.`;
+  if(m >= 60) return `${Math.floor(m/60)} ชม. ${m%60} นาที`;
+  return `${m} นาที`;
+}
+async function lbLoad(){
+  const el = document.getElementById('rankRoot'); if(!el) return;
+  if(!isOnlineMode() || !ON.token){ lbView.err='ลีดเดอร์บอร์ดใช้ได้เฉพาะโหมดออนไลน์'; renderRank(); return; }
+  lbView.loading = true; lbView.err=''; renderRank();
+  try{
+    if((profile.lbPending||[]).length) await onlineTick();
+    const r = await onlineRpc({ a:'lbTop', t:ON.token, ty:lbView.ty, prev:lbView.prev });
+    if(r && r.ok){ lbView.data = r; lbView.data._at = Date.now(); } else lbView.err = (r && r.error) || 'โหลดไม่สำเร็จ';
+  } catch(e){ lbView.err = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'; }
+  lbView.loading = false; renderRank();
+}
+function lbSet(ty, prev){ lbView.ty = ty; lbView.prev = !!prev; lbView.data = null; lbLoad(); }
+function renderRank(){
+  const el = document.getElementById('rankRoot'); if(!el) return;
+  const d = lbView.data && lbView.data.ty===lbView.ty ? lbView.data : null;
+  const chips = ['h','d','w','m'].map(t=>`<button class="chip ${lbView.ty===t?'on':''}" onclick="lbSet('${t}', ${lbView.prev})">${LB_LABEL[t]}</button>`).join('');
+  const prevChips = `<button class="chip ${!lbView.prev?'on':''}" onclick="lbSet('${lbView.ty}', false)">รอบนี้</button><button class="chip ${lbView.prev?'on':''}" onclick="lbSet('${lbView.ty}', true)">รอบที่แล้ว</button>`;
+  const pending = (profile && profile.lbPending||[]).reduce((s,x)=>s+x.p,0);
+  let body = '';
+  if(lbView.err) body = `<div class="empty-msg">${esc(lbView.err)}</div>`;
+  else if(!d) body = `<div class="empty-msg">กำลังโหลด…</div>`;
+  else {
+    const left = d.endsAt - (d.now + (Date.now() - d._at));
+    const head = lbView.prev ? `<div class="note">รอบที่จบแล้ว — อันดับ 1–10 ได้รางวัลเข้าบัญชีอัตโนมัติ</div>`
+      : `<div class="note">รอบนี้จบในอีก <b>${fmtLeft(left)}</b> · ผู้ร่วมล่า ${d.total} คน</div>`;
+    const me = d.me ? `<div class="part-pick-item" style="border-color:var(--accent)"><div>👤 อันดับของคุณ: <b>#${d.me.rank}</b> · ${d.me.p} คะแนน</div></div>`
+      : `<div class="note">คุณยังไม่มีคะแนนในรอบนี้</div>`;
+    const list = d.top.length ? d.top.map((x,i)=>{
+      const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`;
+      return `<div class="part-pick-item" style="${x.me?'border-color:var(--accent);':''}${i<10?'':'opacity:.75'}"><div>${medal} ${esc(x.n)}${x.me?' (คุณ)':''}</div><div><b>${x.p}</b> คะแนน</div></div>`;
+    }).join('') : `<div class="empty-msg">ยังไม่มีใครทำคะแนนในรอบนี้ — ชนะด่านไหนก็ได้เพื่อขึ้นอันดับ!</div>`;
+    body = head + me + `<div style="margin-top:8px;">${list}</div>`;
+  }
+  const rw = LB_REWARD_TABLE[lbView.ty].map(r=>[`อันดับ ${r[0]}`, `💎 ${r[1].toLocaleString()} · 🎒 ${r[2]}`]);
+  el.innerHTML = `<div class="panel">
+      <h2>🏆 ลีดเดอร์บอร์ดการล่า</h2>
+      <div style="margin:6px 0;">${chips}</div>
+      <div style="margin-bottom:6px;">${prevChips} <button class="chip" onclick="lbLoad()">🔄 รีเฟรช</button></div>
+      ${pending?`<div class="note">⏳ คะแนนที่รอส่งขึ้นเซิร์ฟเวอร์ ${pending} คะแนน</div>`:''}
+      ${body}
+    </div>
+    <div class="panel">
+      <h2>🎁 รางวัล${LB_LABEL[lbView.ty]}</h2>
+      ${gTable(['อันดับ','รางวัล'], rw)}
+      <div class="note">คะแนน: ชนะด่านโรงพยาบาล 1 · โรงเรียน 2 · ค่ายทหาร 3 · ซากเมือง 5 · ท่อน้ำ 10 (สงครามกิลไม่นับ)<br>
+      รางวัลส่งเข้าบัญชีอัตโนมัติหลังรอบจบ (ภายในไม่กี่นาทีที่เข้าเกม) · เวลาไทย · สัปดาห์เริ่มวันจันทร์<br>
+      ⚠️ ถ้าไม่เข้าเกมนานเกิน 24 ชม. (รายชั่วโมง) / 14 วัน (รายวัน) / 10 สัปดาห์ / 4 เดือน รางวัลรอบนั้นจะหมดอายุ</div>
+    </div>`;
+}
+setInterval(()=>{ if(document.querySelector('.screen.active[data-screen="rank"]') && lbView.data && !lbView.loading) renderRank(); }, 30000);
+
+// =====================================================================
+// 🏪 ตลาดผู้เล่น — ขายเป็นเพชรเท่านั้น · ภาษี 30% · ไอดีใหม่ < 7 วัน ปลดล็อก 600 เพชร (ครั้งเดียว)
+// =====================================================================
+const MKT_TAX_PCT = 30;
+const MKT_UNLOCK_COST = 600;
+const MKT_NEW_DAYS = 7;
+const MKT_CAT_LABEL = { all:'ทั้งหมด', potion:'🧪 ยา/เสบียง', material:'🪵 วัตถุดิบ', part:'🦴 อวัยวะ', gear:'⚔️ อุปกรณ์', dna:'🧬 DNA', box:'📦 กล่องเก็บเงิน' };
+const MKT_POTION_IDS = ['heal_potion','oil','exp_potion','dropmult_potion'];
+let mkt = { list:null, cat:'all', loading:false, err:'', mineOnly:false };
+function mktCatOfItem(item){
+  if(!item) return 'material';
+  if(item.kind==='part') return 'part';
+  if(item.kind==='gear') return 'gear';
+  if(item.kind==='dna') return 'dna';
+  if(item.itemId==='money_box') return 'box';
+  if(MKT_POTION_IDS.includes(item.itemId)) return 'potion';
+  return 'material';
+}
+function mktItemLabel(item){
+  if(!item) return '?';
+  if(item.kind==='item'){ const d = ITEM_DEFS[item.itemId]; return `${d && d.icon ? d.icon+' ' : ''}${d ? d.name : item.itemId} x${item.qty}`; }
+  if(item.kind==='part'){ const p=item.part; return `🦴 ${PART_SLOT_LABEL[p.slot]||p.slot} ${(FACTIONS[p.faction]||{}).name||''} เกรด ${p.grade}`; }
+  if(item.kind==='gear'){ const g=item.gear; return `⚔️ ${g.grade?g.grade+' ':''}${g.name} (${EQUIP_SLOT_LABEL[g.slot]||g.slot})`; }
+  if(item.kind==='dna'){ const d=item.pkg; return `🧬 DNA เกรด ${d.grade} เผ่าหลัก ${(FACTIONS[d.primaryFaction]||{}).name||''}`; }
+  return '?';
+}
+function mktReceiveItem(item){
+  if(!item) return;
+  if(item.kind==='item' && ITEM_DEFS[item.itemId]){
+    const qty = Math.max(1, Math.floor(item.qty||1));
+    if(!addItem(item.itemId, qty)) warehouseItems[item.itemId] = (warehouseItems[item.itemId]||0) + qty;   // เต็มทั้งคู่: ฝากตู้เซฟเกินโควตาไว้ก่อน ไม่ให้ของหาย
+  } else if(item.kind==='part' && item.part){
+    parts.push({ ...item.part, id:newId(), equippedTo:null });
+  } else if(item.kind==='gear' && item.gear){
+    equipment.push({ ...item.gear, id:newId(), equippedTo:null });
+  } else if(item.kind==='dna' && item.pkg){
+    dnaPackages.push({ ...item.pkg, id:newId() });
+  }
+}
+function mktAllowed(){
+  if(ON.mktUnlocked) return true;
+  return ON.createdAt && (Date.now() - ON.createdAt >= MKT_NEW_DAYS*86400000);
+}
+async function mktLoad(){
+  if(!isOnlineMode() || !ON.token){ mkt.err = 'ตลาดผู้เล่นใช้ได้เฉพาะโหมดออนไลน์'; renderP2PMarket(); return; }
+  mkt.loading = true; mkt.err=''; renderP2PMarket();
+  try{
+    const r = await onlineRpc({ a:'mktBrowse', t:ON.token });
+    if(r && r.ok){ mkt.list = r.list; mkt.serverAllowed = !!r.allowed; }
+    else mkt.err = (r && r.error) || 'โหลดตลาดไม่สำเร็จ';
+  } catch(e){ mkt.err = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'; }
+  mkt.loading = false; renderP2PMarket();
+}
+function mktSetCat(c){ mkt.cat = c; renderP2PMarket(); }
+function mktToggleMine(){ mkt.mineOnly = !mkt.mineOnly; renderP2PMarket(); }
+function renderP2PMarket(){
+  const el = document.getElementById('p2pMarket'); if(!el) return;
+  const allowed = mktAllowed() || mkt.serverAllowed;
+  let gate = '';
+  if(!allowed){
+    const daysLeft = ON.createdAt ? Math.ceil((ON.createdAt + MKT_NEW_DAYS*86400000 - Date.now())/86400000) : MKT_NEW_DAYS;
+    gate = `<div class="part-pick-item" style="border-color:var(--accent)"><div>🔒 ไอดีใหม่ (อีก ${daysLeft} วันถึงจะครบ ${MKT_NEW_DAYS} วัน) ต้องปลดล็อกก่อนซื้อขาย<div class="note" style="margin:2px 0 0;">จ่ายครั้งเดียว ใช้ได้ตลอด</div></div>
+      <button class="diamond" onclick="mktUnlock()" ${profile.diamonds<MKT_UNLOCK_COST?'disabled':''}>ปลดล็อก · ${MKT_UNLOCK_COST}💎</button></div>`;
+  }
+  const counts = { all:0 };
+  (mkt.list||[]).forEach(x=>{ counts.all++; counts[x.cat]=(counts[x.cat]||0)+1; });
+  const chips = Object.keys(MKT_CAT_LABEL).map(c=>`<button class="chip ${mkt.cat===c?'on':''}" onclick="mktSetCat('${c}')">${MKT_CAT_LABEL[c]}<span class="cnt">${counts[c]||0}</span></button>`).join('')
+    + `<button class="chip ${mkt.mineOnly?'on':''}" onclick="mktToggleMine()">📌 ของที่ฉันขาย</button>`;
+  let body;
+  if(mkt.err) body = `<div class="empty-msg">${esc(mkt.err)}</div>`;
+  else if(!mkt.list) body = `<div class="empty-msg">กำลังโหลด…</div>`;
+  else {
+    const rows = mkt.list.filter(x=>(mkt.cat==='all'||x.cat===mkt.cat) && (!mkt.mineOnly||x.mine));
+    body = rows.length ? rows.map(x=>`<div class="part-pick-item">
+        <div>${mktItemLabel(x.item)}<div class="note" style="margin:2px 0 0;">ผู้ขาย ${esc(x.sn)}${x.mine?' (คุณ)':''}</div></div>
+        ${x.mine ? `<button class="ghost" onclick="mktCancel('${x.id}')">ยกเลิก · ${x.price}💎</button>`
+                 : `<button class="diamond" onclick="mktBuy('${x.id}', ${x.price})" ${(!allowed||profile.diamonds<x.price)?'disabled':''}>ซื้อ · ${x.price.toLocaleString()}💎</button>`}
+      </div>`).join('') : `<div class="empty-msg">ยังไม่มีสินค้าในหมวดนี้</div>`;
+  }
+  el.innerHTML = `<h2>🏪 ตลาดผู้เล่น</h2>
+    <div class="note">ซื้อขายด้วยเพชรเท่านั้น · ผู้ขายเสียภาษี ${MKT_TAX_PCT}% ของราคาขาย · ลงขายพร้อมกันได้ 20 รายการ · ของ/เพชรที่ได้จะเข้าบัญชีอัตโนมัติ</div>
+    ${gate}
+    <div class="row" style="margin:8px 0;">
+      <button class="primary" onclick="mktOpenSell()" ${allowed?'':'disabled'}>➕ ลงขายของ</button>
+      <button class="ghost" style="flex:0 0 auto;" onclick="mktLoad()">🔄</button>
+    </div>
+    <div style="margin-bottom:6px;">${chips}</div>
+    ${body}`;
+}
+async function mktUnlock(){
+  if(profile.diamonds < MKT_UNLOCK_COST){ showToast('เพชรไม่พอ'); return; }
+  let r; try{ r = await onlineRpc({ a:'mktUnlock', t:ON.token }); } catch(e){ showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); return; }
+  if(!r || !r.ok){ showToast((r&&r.error)||'ปลดล็อกไม่สำเร็จ'); return; }
+  if(!r.already) profile.diamonds -= MKT_UNLOCK_COST;
+  ON.mktUnlocked = true;
+  await saveProfile(); onlineFlush(); renderAll(); renderP2PMarket();
+  showToast('ปลดล็อกตลาดผู้เล่นแล้ว!');
+}
+async function mktBuy(id, price){
+  if(!mktAllowed() && !mkt.serverAllowed){ showToast('ต้องปลดล็อกตลาดก่อน'); return; }
+  if(profile.diamonds < price){ showToast('เพชรไม่พอ'); return; }
+  let r; try{ r = await onlineRpc({ a:'mktBuy', t:ON.token, id, price }); } catch(e){ showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); return; }
+  if(!r || !r.ok){ showToast((r&&r.error)||'ซื้อไม่สำเร็จ'); mktLoad(); return; }
+  profile.diamonds -= r.price;
+  await saveProfile(); onlineFlush();
+  showToast(`ซื้อสำเร็จ -${r.price} 💎 กำลังส่งของเข้ากระเป๋า…`);
+  await onlineTick();
+  renderAll(); mktLoad();
+}
+async function mktCancel(id){
+  let r; try{ r = await onlineRpc({ a:'mktCancel', t:ON.token, id }); } catch(e){ showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); return; }
+  if(!r || !r.ok){ showToast((r&&r.error)||'ยกเลิกไม่สำเร็จ'); mktLoad(); return; }
+  await onlineTick(); mktLoad();
+}
+// ---- ลงขาย ----
+function mktSellables(){
+  const out = [];
+  const pushItems = (src, where)=> Object.entries(src).filter(([k,q])=>q>0 && ITEM_DEFS[k]).forEach(([k,q])=>
+    out.push({ key:'i:'+where+':'+k, cat:mktCatOfItem({kind:'item', itemId:k}), label:`${ITEM_DEFS[k].icon?ITEM_DEFS[k].icon+' ':''}${ITEM_DEFS[k].name} (${where==='bag'?'กระเป๋า':'ตู้เซฟ'})`, max:q }));
+  pushItems(bagItems,'bag'); pushItems(warehouseItems,'wh');
+  parts.filter(p=>!p.equippedTo).forEach(p=> out.push({ key:'p:'+p.id, cat:'part', label:mktItemLabel({kind:'part', part:p}), max:1 }));
+  equipment.filter(g=>!g.equippedTo).forEach(g=> out.push({ key:'g:'+g.id, cat:'gear', label:mktItemLabel({kind:'gear', gear:g}), max:1 }));
+  dnaPackages.forEach(d=> out.push({ key:'d:'+d.id, cat:'dna', label:mktItemLabel({kind:'dna', pkg:d}), max:1 }));
+  return out;
+}
+let mktSellCat = 'all';
+function mktOpenSell(cat){
+  if(battleActive){ showToast('ทำรายการระหว่างต่อสู้ไม่ได้'); return; }
+  if(cat) mktSellCat = cat;
+  const all = mktSellables();
+  const list = all.filter(x=>mktSellCat==='all'||x.cat===mktSellCat);
+  const chips = Object.keys(MKT_CAT_LABEL).map(c=>`<button class="chip ${mktSellCat===c?'on':''}" onclick="mktOpenSell('${c}')">${MKT_CAT_LABEL[c]}</button>`).join('');
+  document.getElementById('partPickContent').innerHTML = `<div class="panel">
+    <h2>➕ ลงขายในตลาดผู้เล่น</h2>
+    <div class="note">ของที่ใส่อยู่กับตัวละครต้องถอดก่อนถึงจะขายได้ · ได้รับจริง ${100-MKT_TAX_PCT}% ของราคา</div>
+    <div style="margin:6px 0;">${chips}</div>
+    ${list.length ? list.map(x=>`<div class="part-pick-item" style="flex-wrap:wrap;gap:6px;">
+        <div style="flex:1 1 100%;">${x.label}${x.max>1?` · มี ${x.max}`:''}</div>
+        ${x.max>1?`<input type="number" id="mq_${x.key.replace(/[^a-zA-Z0-9]/g,'_')}" min="1" max="${x.max}" value="1" style="width:70px;" placeholder="จำนวน">`:''}
+        <input type="number" id="mp_${x.key.replace(/[^a-zA-Z0-9]/g,'_')}" min="1" placeholder="ราคา 💎" style="width:100px;" oninput="mktNetHint('${x.key.replace(/[^a-zA-Z0-9]/g,'_')}')">
+        <span class="note" id="mn_${x.key.replace(/[^a-zA-Z0-9]/g,'_')}" style="margin:0;"></span>
+        <button class="primary" onclick="mktSell('${x.key}')">ลงขาย</button>
+      </div>`).join('') : `<div class="empty-msg">ไม่มีของที่ขายได้ในหมวดนี้</div>`}
+  </div>`;
+  document.getElementById('partPickOverlay').classList.add('show');
+}
+function mktNetHint(k){
+  const p = Math.floor(Number((document.getElementById('mp_'+k)||{}).value));
+  const el = document.getElementById('mn_'+k);
+  if(el) el.textContent = p>0 ? `ได้รับ ${Math.floor(p*(100-MKT_TAX_PCT)/100)}💎` : '';
+}
+async function mktSell(key){
+  if(battleActive){ showToast('ทำรายการระหว่างต่อสู้ไม่ได้'); return; }
+  const k = key.replace(/[^a-zA-Z0-9]/g,'_');
+  const price = Math.floor(Number((document.getElementById('mp_'+k)||{}).value));
+  if(!(price>=1 && price<=1000000)){ showToast('ใส่ราคาเป็นเพชร 1–1,000,000'); return; }
+  const [t, a, b] = key.split(':');
+  let item, restore;
+  if(t==='i'){
+    const src = a==='bag' ? bagItems : warehouseItems;
+    const have = src[b]||0;
+    const qty = Math.floor(Number((document.getElementById('mq_'+k)||{value:1}).value)) || 1;
+    if(qty<1 || qty>have){ showToast(`จำนวนต้องอยู่ระหว่าง 1–${have}`); return; }
+    src[b] = have - qty; if(src[b]<=0) delete src[b];
+    item = { kind:'item', itemId:b, qty };
+    restore = ()=>{ src[b] = (src[b]||0) + qty; };
+  } else if(t==='p'){
+    const p = parts.find(x=>x.id===a); if(!p || p.equippedTo){ showToast('ชิ้นส่วนนี้ขายไม่ได้'); return; }
+    parts = parts.filter(x=>x.id!==a);
+    const { id:_i, equippedTo:_e, ...rest } = p; item = { kind:'part', part:rest };
+    restore = ()=>{ parts.push(p); };
+  } else if(t==='g'){
+    const g = equipment.find(x=>x.id===a); if(!g || g.equippedTo){ showToast('อุปกรณ์นี้ขายไม่ได้'); return; }
+    equipment = equipment.filter(x=>x.id!==a);
+    const { id:_i, equippedTo:_e, ...rest } = g; item = { kind:'gear', gear:rest };
+    restore = ()=>{ equipment.push(g); };
+  } else if(t==='d'){
+    const d = dnaPackages.find(x=>x.id===a); if(!d){ return; }
+    dnaPackages = dnaPackages.filter(x=>x.id!==a);
+    const { id:_i, ...rest } = d; item = { kind:'dna', pkg:rest };
+    restore = ()=>{ dnaPackages.push(d); };
+  } else return;
+  const saveAll = async ()=>{ await saveBagItems(); await saveWarehouseItems(); await saveParts(); await saveEquipment(); await saveDNAPackages(); };
+  await saveAll(); onlineFlush();
+  let r; try{ r = await onlineRpc({ a:'mktSell', t:ON.token, item, price, cat:mktCatOfItem(item) }); } catch(e){ r = { ok:false, error:'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้' }; }
+  if(!r || !r.ok){ restore(); await saveAll(); onlineFlush(); renderAll(); showToast((r&&r.error)||'ลงขายไม่สำเร็จ'); return; }
+  renderAll(); closePartPick();
+  showToast(`ลงขาย ${mktItemLabel(item)} ราคา ${price}💎 แล้ว`);
+  mktLoad();
+}
+
 // ---------- tabs ----------
 document.querySelectorAll('#tabnav button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -4678,7 +5120,8 @@ document.querySelectorAll('#tabnav button').forEach(btn=>{
     });
     if(tab==='battle' && !battleActive){ renderPickGrid(); renderStageGrid(); }
     if(tab==='guild'){ renderGuildTab(); refreshGuildData(); }
-    if(tab==='market'){ renderTopupPanel(); loadTopupInfo(); }
+    if(tab==='market'){ renderTopupPanel(); loadTopupInfo(); mktLoad(); }
+    if(tab==='rank'){ lbLoad(); }
   });
 });
 
@@ -4716,6 +5159,13 @@ useSupplies = guardAsync(useSupplies);
 useExpPotion = guardAsync(useExpPotion);
 useDropPotion = guardAsync(useDropPotion);
 buyPipeMap = guardAsync(buyPipeMap);
+openMoneyBox = guardAsync(openMoneyBox);
+vaultDeposit = guardAsync(vaultDeposit);
+vaultWithdraw = guardAsync(vaultWithdraw);
+mktUnlock = guardAsync(mktUnlock);
+mktBuy = guardAsync(mktBuy);
+mktCancel = guardAsync(mktCancel);
+mktSell = guardAsync(mktSell);
 upgradeStorage = guardAsync(upgradeStorage);
 upgradeBag = guardAsync(upgradeBag);
 equipPart = guardAsync(equipPart);
