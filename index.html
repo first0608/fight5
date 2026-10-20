@@ -360,6 +360,12 @@
   .lb-row{ display:flex; justify-content:space-between; gap:8px; padding:7px 10px; border-radius:10px; font-size:13px; }
   .lb-row:nth-child(odd){ background:var(--bg-2); } .lb-row.me{ outline:1px solid var(--accent); }
   button.big{ padding:12px; font-size:15px; border-radius:12px; }
+  .wheel-wrap{ position:relative; width:min(280px,78vw); aspect-ratio:1; margin:14px auto 16px; }
+  .wheel{ position:absolute; inset:0; border-radius:50%; border:6px solid #e0a83a; box-shadow:0 0 0 4px var(--bg-2), 0 10px 30px rgba(0,0,0,.45), inset 0 0 30px rgba(0,0,0,.35); }
+  .wheel .wl{ position:absolute; left:50%; top:0; width:0; height:50%; transform-origin:bottom center; }
+  .wheel .wl span{ position:absolute; top:10px; left:-24px; width:48px; text-align:center; font-size:12px; font-weight:800; line-height:1.15; color:#fff; text-shadow:0 1px 2px #000; }
+  .wheel-hub{ position:absolute; left:50%; top:50%; width:46px; height:46px; margin:-23px 0 0 -23px; border-radius:50%; background:var(--bg-2); border:3px solid #e0a83a; display:grid; place-items:center; font-size:20px; }
+  .wheel-ptr{ position:absolute; top:-14px; left:50%; transform:translateX(-50%); z-index:2; font-size:26px; color:#e0a83a; text-shadow:0 2px 4px #000; }
   .hdr-row{ display:flex; align-items:center; gap:6px; }
   .hdr-row h2{ margin:0; flex:1; min-width:0; }
   .hdr-row > button{ flex:0 0 auto; padding:7px 12px; }
@@ -598,6 +604,7 @@
     <div class="screen" data-screen="wboss"><div id="wbRoot"></div></div>
     <div class="screen" data-screen="tower"><div id="towerRoot"></div></div>
     <div class="screen" data-screen="bounty"><div id="bountyRoot"></div></div>
+    <div class="screen" data-screen="wheel"><div id="wheelRoot"></div></div>
 
   </div>
 
@@ -620,7 +627,7 @@
         <button class="tile" onclick="goTab('quest')"><span class="ic">🎯</span>เควส<span class="nbadge" id="tileQuestBadge" style="display:none;">0</span></button>
         <button class="tile" onclick="closeMoreSheet(); openChat()"><span class="ic">💬</span>แชท</button>
         <button class="tile" onclick="closeMoreSheet(); openGuide()"><span class="ic">📖</span>คู่มือ</button>
-        <button class="tile" onclick="goTab('rank')"><span class="ic">🏆</span>อันดับ</button>
+        <button class="tile" onclick="goTab('wheel')"><span class="ic">🎡</span>กงล้อลุ้นโชค</button>
       </div>
     </div>
   </div>
@@ -1364,8 +1371,9 @@ function renderGuide(){
     ระหว่างต่อสู้ใช้เมนู/ฟังก์ชันอื่นไม่ได้ (ต้องปิดไฟต์ก่อน) · ตลาดผู้เล่นตั้งราคาขั้นต่ำ ${MKT_MIN_PRICE} เพชร`));
   secs.push(gSec('🏆 แข่งขัน: อารีน่า · บอสโลก · หอคอย · ค่าหัว · แชท', `
     <b>⚔️ อารีน่า:</b> สู้กับทีมของผู้เล่นอื่น (AI ควบคุม) วันละ ${cfgSet('arena_daily')} ครั้ง (ซื้อเพิ่ม ${cfgSet('arena_extra_price')}💎/ครั้ง) · เรตติ้งเริ่ม 1000 ชนะ/แพ้ ได้/เสียแต้มตามความต่างเรต · ซีซันจบทุกวันจันทร์ แจกรางวัลท็อป 10 · ไม่มีของตก ไม่เสียเลือดจริง<br>
-    <b>👹 บอสโลก:</b> บอสเกิดใหม่ทุกวันจันทร์ ทั้งเซิร์ฟช่วยกันตี วันละ ${cfgSet('wb_daily')} ครั้ง ครั้งละ ${WB_MAX_ROUNDS} รอบ · ปราบได้ = ทุกคนที่ร่วมตีได้ 💎${cfgSet('wb_kill_dia')} + 🪙${cfgSet('wb_kill_coin').toLocaleString()} · ท็อปดาเมจรายสัปดาห์ได้รางวัลเพิ่ม<br>
+    <b>👹 บอสโลก:</b> บอสตัวใหม่ทุกวันจันทร์ ทั้งเซิร์ฟช่วยกันตี วันละ ${cfgSet('wb_daily')} ครั้ง · ปราบได้ = ทุกคนที่ร่วมตีได้เพชร+เหรียญ (ดูในหน้าบอสโลก) · ท็อปดาเมจรายสัปดาห์ได้รางวัลเพิ่ม<br>
     <b>🗼 หอคอยไม่รู้จบ:</b> ปีนวันละ ${cfgSet('tower_daily')} รอบ เลือดต่อเนื่องทุกชั้น (ใช้น้ำยาระหว่างชั้นได้) · ทุก 5 ชั้นได้เหรียญ ทุก 10 ชั้นได้เพชร (ครั้งแรกของเดือน) · อันดับชั้นสูงสุดรายเดือน<br>
+    <b>☠️ ล่านักล่า:</b> ดักคนที่เคยดักคนอื่นสำเร็จ แล้วชนะ = ได้ 💎 ${cfgSet('pvp_hunt_dia')} ต่อ 1 คนที่เขาล่ามา (สูงสุด ${cfgSet('pvp_hunt_cap')}💎) แล้วนับของเขาใหม่จาก 0<br>
     <b>🎯 ค่าหัว:</b> ตั้งค่าหัวผู้เล่นด้วยเพชร (ขั้นต่ำ ${cfgSet('bounty_min')}💎) · ตัวแดงโดนระบบตั้งให้อัตโนมัติ · ใครดักเป้าหมายชนะ ได้ค่าหัวทั้งหมด<br>
     <b>🏗️ อันดับผู้ช่วยเควส:</b> ส่งปูน/เหล็กเส้นให้ทหารมากที่สุดในเดือน ท็อป 10 ได้รางวัล<br>
     <b>💬 แชท:</b> ปุ่ม 💬 มุมขวาล่าง คุยได้ทั้งเซิร์ฟ และในกิล`));
@@ -1684,6 +1692,8 @@ const ITEM_DEFS = {
   cement:           { name:'ปูน',               icon:'🧱' },
   rebar:            { name:'เหล็กเส้น',          icon:'🔩' },
   blueprint_ticket: { name:'ใบสุ่มแปลนคราฟอุปกรณ์', icon:'📜' },
+  dna_box:          { name:'กล่องสุ่ม DNA เพชร',  icon:'🧬' },
+  vip_box_1d:       { name:'กล่อง VIP 1 วัน',     icon:'👑' },
   ore_iron:         { name:'เศษแร่เหล็ก',       icon:null, mat:'ore_iron' },
   log_hardwood:     { name:'ไม้เนื้อแข็ง',      icon:null, mat:'log_hardwood' },
   log_teak:         { name:'ไม้สัก',            icon:null, mat:'log_teak' },
@@ -2737,6 +2747,8 @@ function itemRowHtml(id, qty, location){
     if(id==='exp_potion') actions += `<button onclick="useExpPotion()">ใช้${profile.expBoostActive?' (เปิดอยู่)':''}</button>`;
     if(id==='dropmult_potion') actions += `<button onclick="useDropPotion()">ใช้${profile.dropBoostActive?' (เปิดอยู่)':''}</button>`;
     if(id==='money_box') actions += `<button onclick="openMoneyBox()">เปิด</button>`;
+    if(id==='dna_box') actions += `<button onclick="openDnaBox()">เปิด</button>`;
+    if(id==='vip_box_1d') actions += `<button onclick="useVipBox()">ใช้</button>`;
     if(def.mat) actions += `<button onclick="sellMaterial('${id}')" title="ขายทั้งหมดในกระเป๋า">ขาย ${(matSellPrice(id)*qty).toLocaleString()}🪙</button>`;
     actions += `<button class="ghost" onclick="moveItemToWarehouse('${id}')">→ตู้เซฟ</button>`;
   } else {
@@ -5191,7 +5203,8 @@ function renderTeamHp(){
 // =====================================================================
 // 🏦 คลังเพชร — ฝาก/ถอนได้อย่างละ 200 เพชรต่อวัน (รีเซ็ต 00:00 น. เวลาไทย) · เพชรในคลังไม่ตกเมื่อตาย
 // =====================================================================
-const VAULT_DAILY_LIMIT = 200;
+const VAULT_DAILY_LIMIT = 200, VAULT_DAILY_LIMIT_VIP = 400;
+function vaultLimit(){ return isVip() ? VAULT_DAILY_LIMIT_VIP : VAULT_DAILY_LIMIT; }
 function thDayKey(ts){ const d = new Date((ts||Date.now()) + 7*3600000); return d.toISOString().slice(0,10); }
 function getVault(){
   if(!profile.diaVault) profile.diaVault = { bal:0, day:thDayKey(), dep:0, wd:0 };
@@ -5205,12 +5218,12 @@ function renderVault(){
   const v = getVault();
   const mins = Math.ceil(msToThMidnight()/60000);
   el.innerHTML = `<h2>🏦 คลังเพชร</h2>
-    <div class="note">เพชรในคลัง <b>ไม่ตก</b> เมื่อแพ้ยกทีม · ฝากได้วันละ ${VAULT_DAILY_LIMIT} · ถอนได้วันละ ${VAULT_DAILY_LIMIT} · รีเซ็ตโควตาเวลา 00:00 น. (อีก ${Math.floor(mins/60)} ชม. ${mins%60} นาที)</div>
+    <div class="note">เพชรในคลัง <b>ไม่ตก</b> เมื่อแพ้ยกทีม · ฝากได้วันละ ${vaultLimit()} · ถอนได้วันละ ${vaultLimit()} ${isVip()?' (👑 VIP)':` (VIP ${VAULT_DAILY_LIMIT_VIP})`} · รีเซ็ตโควตาเวลา 00:00 น. (อีก ${Math.floor(mins/60)} ชม. ${mins%60} นาที)</div>
     <div class="row" style="margin-top:8px;align-items:center;">
-      <div style="font-size:13px;">💎 ในคลัง <b>${Math.floor(v.bal)}</b><div class="note" style="margin:0;">วันนี้ฝากแล้ว ${v.dep}/${VAULT_DAILY_LIMIT} · ถอนแล้ว ${v.wd}/${VAULT_DAILY_LIMIT}</div></div>
+      <div style="font-size:13px;">💎 ในคลัง <b>${Math.floor(v.bal)}</b><div class="note" style="margin:0;">วันนี้ฝากแล้ว ${v.dep}/${vaultLimit()} · ถอนแล้ว ${v.wd}/${vaultLimit()}</div></div>
     </div>
     <div class="row" style="margin-top:8px;">
-      <input type="number" id="vaultAmt" min="1" max="${VAULT_DAILY_LIMIT}" placeholder="จำนวนเพชร">
+      <input type="number" id="vaultAmt" min="1" max="${vaultLimit()}" placeholder="จำนวนเพชร">
       <button class="diamond" style="flex:0 0 auto;" onclick="vaultDeposit()">ฝาก</button>
       <button class="ghost" style="flex:0 0 auto;" onclick="vaultWithdraw()">ถอน</button>
     </div>`;
@@ -5220,7 +5233,7 @@ async function vaultDeposit(){
   if(battleActive){ showToast('ทำรายการระหว่างต่อสู้ไม่ได้'); return; }
   const v = getVault(); const n = vaultAmt();
   if(!n){ showToast('ใส่จำนวนเพชรก่อน'); return; }
-  const left = VAULT_DAILY_LIMIT - v.dep;
+  const left = vaultLimit() - v.dep;
   if(n > left){ showToast(`วันนี้ฝากได้อีก ${left} เพชร`); return; }
   if(profile.diamonds < n){ showToast('เพชรในตัวไม่พอ'); return; }
   profile.diamonds -= n; v.bal += n; v.dep += n;
@@ -5230,7 +5243,7 @@ async function vaultWithdraw(){
   if(battleActive){ showToast('ทำรายการระหว่างต่อสู้ไม่ได้'); return; }
   const v = getVault(); const n = vaultAmt();
   if(!n){ showToast('ใส่จำนวนเพชรก่อน'); return; }
-  const left = VAULT_DAILY_LIMIT - v.wd;
+  const left = vaultLimit() - v.wd;
   if(n > left){ showToast(`วันนี้ถอนได้อีก ${left} เพชร`); return; }
   if(v.bal < n){ showToast('เพชรในคลังไม่พอ'); return; }
   v.bal -= n; v.wd += n; profile.diamonds += n;
@@ -5247,7 +5260,7 @@ function renderVipPanel(){
   const el = document.getElementById('vipPanel'); if(!el || !profile) return;
   const on = isVip();
   el.innerHTML = `<h2>👑 แพ็ค VIP</h2>
-    <div class="note">ปลดล็อกปุ่ม <b>⚡ จบทันที</b> ในหน้าต่อสู้ — กดปุ๊บคำนวณการต่อสู้จนจบทันที ไม่ต้องรอดูทีละเทิร์น</div>
+    <div class="note">สิทธิ์ VIP: <b>⚡ จบทันที</b> ในหน้าต่อสู้ · 🔒 ล็อกของที่สวมใส่ 1 ชิ้น · 🏦 ฝาก/ถอนคลังเพชรได้วันละ ${VAULT_DAILY_LIMIT_VIP} (ปกติ ${VAULT_DAILY_LIMIT})</div>
     <div class="part-pick-item"><div>${on ? `✅ VIP ใช้งานอยู่ ถึง <b>${fmtThDate(profile.vipUntil)}</b>` : 'ยังไม่ได้เป็น VIP'}<div class="note" style="margin:2px 0 0;">${VIP_PRICE}💎 / ${VIP_DAYS} วัน · ซื้อซ้ำ = ต่ออายุเพิ่ม ${VIP_DAYS} วัน</div></div>
       <button class="diamond" onclick="buyVip()" ${profile.diamonds<VIP_PRICE?'disabled':''}>${on?'ต่ออายุ':'ซื้อ'} · ${VIP_PRICE}💎</button></div>
     <div class="note" style="margin-top:8px;">🔒 <b>ล็อกของที่สวมใส่ 1 ชิ้น</b> (DNA ที่ติดตั้ง / ชิ้นส่วนอวัยวะ / อุปกรณ์) — ชิ้นที่ล็อกจะไม่ตกเมื่อแพ้ยกทีมหรือโดนดัก${on?'':' (เฉพาะ VIP)'}</div>
@@ -5279,6 +5292,21 @@ function instantBattle(){
 // 📦 กล่องเก็บเงิน — ซื้อ 100 เพชร เปิดได้ 5,000 เหรียญ (ขายในตลาดผู้เล่นได้)
 // =====================================================================
 const MONEY_BOX_COINS = 5000;
+async function openDnaBox(){
+  if(battleActive){ showToast('ใช้ของระหว่างต่อสู้ไม่ได้'); return; }
+  if(dnaPackages.length >= DNA_CAP){ showToast(`คลัง DNA เต็ม (สูงสุด ${DNA_CAP} ชิ้น)`); return; }
+  if(!(await consumeItem('dna_box'))){ showToast('ไม่มีกล่องสุ่ม DNA'); return; }
+  const pkg = rollDNAPackage('diaW'); dnaPackages.push(pkg);
+  await saveDNAPackages(); renderAll();
+  showToast(`🧬 ได้แพ็ค DNA เกรด ${pkg.grade}!`);
+}
+async function useVipBox(){
+  if(battleActive){ showToast('ใช้ของระหว่างต่อสู้ไม่ได้'); return; }
+  if(!(await consumeItem('vip_box_1d'))){ showToast('ไม่มีกล่อง VIP'); return; }
+  profile.vipUntil = Math.max(Date.now(), profile.vipUntil||0) + 86400000;
+  await saveProfile(); renderAll();
+  showToast(`👑 VIP +1 วัน (ถึง ${fmtThDate(profile.vipUntil)})`);
+}
 async function openMoneyBox(){
   if(battleActive){ showToast('ใช้ของระหว่างต่อสู้ไม่ได้'); return; }
   const ok = await consumeItem('money_box');
@@ -5343,7 +5371,7 @@ async function onlineTick(){
       lines.push(d.why==='cancel' ? `↩️ ยกเลิกขาย ได้ ${label} คืน` : `🛒 ได้รับ ${label} (ซื้อจาก ${esc(d.from)})`);
     });
     if(r.rewards && r.rewards.length) questAdd('lb', r.rewards.length);
-    (r.wbReward||[]).forEach(x=>{ profile.diamonds += x.dia||0; profile.coins += x.coin||0; lines.push(`👹 บอสโลกถูกปราบแล้ว! รางวัลผู้ร่วมตี → 💎 ${x.dia} · 🪙 ${(x.coin||0).toLocaleString()}`); });
+    (r.wbReward||[]).forEach(x=>{ profile.diamonds += x.dia||0; profile.coins += x.coin||0; lines.push(`👹 บอสโลก${x.name?' '+esc(x.name):''} ถูกปราบแล้ว! รางวัลผู้ร่วมตี → 💎 ${x.dia} · 🪙 ${(x.coin||0).toLocaleString()}`); });
     (r.arenaNotes||[]).forEach(x=>{ lines.push(x.win ? `🛡️ ทีมของคุณป้องกันอารีน่าจาก ${esc(x.by)} สำเร็จ (เรต +${x.d})` : `⚔️ ${esc(x.by)} ชนะทีมของคุณในอารีน่า (เรต ${x.d})`); });
     if(r.sq){
       profile.sq = { cement:r.sq.cement, rebar:r.sq.rebar, tc:r.sq.tc, tr:r.sq.tr, doneAt:r.sq.doneAt };
@@ -5446,7 +5474,7 @@ const MKT_TAX_PCT = 30;
 const MKT_UNLOCK_COST = 600;
 const MKT_NEW_DAYS = 7;
 const MKT_MIN_PRICE = 30;   // ราคาขั้นต่ำต่อรายการ (เพชร)
-const MKT_CAT_LABEL = { all:'ทั้งหมด', potion:'🧪 ยา/เสบียง', material:'🪵 วัตถุดิบ', part:'🦴 อวัยวะ', gear:'⚔️ อุปกรณ์', dna:'🧬 DNA', box:'📦 กล่องเก็บเงิน/ทองแท่ง', radar:'📡 เรดาห์' };
+const MKT_CAT_LABEL = { all:'ทั้งหมด', potion:'🧪 ยา/เสบียง', material:'🪵 วัตถุดิบ', part:'🦴 อวัยวะ', gear:'⚔️ อุปกรณ์', dna:'🧬 DNA', box:'📦 กล่อง/ทองแท่ง', radar:'📡 เรดาห์' };
 const MKT_POTION_IDS = ['heal_potion','oil','exp_potion','dropmult_potion'];
 let mkt = { list:null, cat:'all', loading:false, err:'', mineOnly:false };
 function mktCatOfItem(item){
@@ -5454,7 +5482,7 @@ function mktCatOfItem(item){
   if(item.kind==='part') return 'part';
   if(item.kind==='gear') return 'gear';
   if(item.kind==='dna') return 'dna';
-  if(item.itemId==='money_box' || item.itemId==='gold_bar') return 'box';
+  if(['money_box','gold_bar','dna_box','vip_box_1d'].includes(item.itemId)) return 'box';
   if(String(item.itemId||'').startsWith('radar_')) return 'radar';
   if(MKT_POTION_IDS.includes(item.itemId)) return 'potion';
   return 'material';
@@ -5917,7 +5945,7 @@ function renderPvpPanel(){
     if(pvpView.loading) list = `<div class="empty-msg">กำลังสแกน${STAGES[pvpView.stage].name}…</div>`;
     else if(pvpView.err) list = `<div class="empty-msg">${esc(pvpView.err)}</div>`;
     else if(pvpView.targets && !pvpView.targets.length) list = `<div class="empty-msg">ไม่พบผู้เล่นที่ดักได้ใน${STAGES[pvpView.stage].name} (ต้องลงฟาร์มด่านนี้ใน 5 นาทีล่าสุด · ไม่มีโล่)</div>`;
-    else if(pvpView.targets) list = pvpView.targets.map(t=>`<div class="part-pick-item"><div><b style="${t.red?'color:var(--bad)':''}">${t.red?'🟥 ':''}${esc(t.n)}</b> · Lv.${t.lv}${t.bounty?` · <b style="color:var(--g-c)">🎯 ค่าหัว ${t.bounty}💎</b>`:''} <span class="note">(ลงด่านเมื่อ ${t.ago} นาทีก่อน)</span>
+    else if(pvpView.targets) list = pvpView.targets.map(t=>`<div class="part-pick-item"><div><b style="${t.red?'color:var(--bad)':''}">${t.red?'🟥 ':''}${esc(t.n)}</b> · Lv.${t.lv}${t.bounty?` · <b style="color:var(--g-c)">🎯 ค่าหัว ${t.bounty}💎</b>`:''}${t.kills?` · <b style="color:var(--bad)">☠️ ล่ามาแล้ว ${t.kills} คน (+${Math.min(cfgSet('pvp_hunt_cap'), t.kills*cfgSet('pvp_hunt_dia'))}💎)</b>`:''} <span class="note">(ลงด่านเมื่อ ${t.ago} นาทีก่อน)</span>
         <div class="note" style="margin:2px 0 0;">${t.team.map(c=>`${(FACTIONS[c.faction]||{}).icon||''} Lv.${c.level} ❤️${c.hp}/${c.maxHp}`).join(' · ')}</div></div>
         <button class="diamond" onclick="pvpAttack('${esc(t.id)}')">ดัก!</button></div>`).join('');
   }
@@ -6005,6 +6033,7 @@ async function endPvpBattle(result){
   try{
     const rr = await onlineRpc({ a:'pvpResult', t:ON.token, attackId:pb.attackId, win: result==='win', loot });
     if(rr && rr.bounty > 0){ profile.diamonds += rr.bounty; await saveProfile(); logLine('sys', `🎯 ได้ค่าหัว 💎 ${rr.bounty.toLocaleString()}!`); }
+    if(rr && rr.hunt > 0){ profile.diamonds += rr.hunt; await saveProfile(); logLine('sys', `☠️ ล่านักล่าสำเร็จ! เป้าหมายเคยดักคนอื่นมา ${rr.huntKills} คน → ได้ 💎 ${rr.hunt.toLocaleString()}`); }
   } catch(e){}
   onlineFlush();
   document.getElementById('btnStep').disabled = true;
@@ -6064,7 +6093,7 @@ const GCFG_DEFAULT = {
   ],
   set: { sq_cement:10000, sq_rebar:10000, sq_points:100, sq_dia:250, sq_drop_pct:20, sq_drop_days:7,
          gold_drop_ruins:0.1, gold_drop_pipe:0.5, build_drop_hospital:30, build_drop_school:40, build_drop_campground:50,
-         build_drop_ruins:60, build_drop_pipe:80, build_drop_max:3, vet_gold_sell:1000 },
+         build_drop_ruins:60, build_drop_pipe:80, build_drop_max:3, vet_gold_sell:1000, pvp_hunt_dia:20, pvp_hunt_cap:1000 },
 };
 let GCFG = JSON.parse(JSON.stringify(GCFG_DEFAULT));
 function cfgSet(k){ const v = GCFG.set && GCFG.set[k]; return v!=null ? Number(v) : Number(GCFG_DEFAULT.set[k]||0); }
@@ -6127,6 +6156,17 @@ async function claimQuest(id){
   await saveProfile(); await saveBagItems(); await saveWarehouseItems();
   renderAll(); renderQuestTab();
   showToast(`🎯 รับรางวัล: ${questRewardText(qd)}`);
+}
+async function claimMonthlyAll(){
+  const q = questState();
+  const ms = GCFG.quests.filter(x=>x.type==='m' && x.on);
+  if(q.mc.__all){ showToast('รับโบนัสเดือนนี้ไปแล้ว'); return; }
+  if(!ms.length || ms.some(qd=>!questClaimed(qd))){ showToast('ต้องรับรางวัลเควสรายเดือนครบทุกอันก่อน'); return; }
+  q.mc.__all = Date.now();
+  questGive('vip_box_1d', 1);
+  await saveProfile(); await saveBagItems(); await saveWarehouseItems();
+  renderAll(); renderQuestTab();
+  showToast('🏅 ได้กล่อง VIP 1 วัน!');
 }
 // ---------- แลกแต้มกิจกรรม ----------
 const EX_HIGH_GRADES = ['S','SS','SSS'];
@@ -6221,7 +6261,11 @@ function renderQuestTab(){
       ${bonus ? `<div class="note" style="color:var(--accent)">🎉 โบนัสเควสเซิร์ฟเวอร์: อัตราดรอป +${bonus}% ถึง ${fmtThDate(profile.sqBonusUntil)}</div>` : ''}
     </div>
     <div class="panel"><h2>📅 เควสรายวัน</h2><div class="note">รีเซ็ตทุกวัน 00:00 น. · ชนะต่อเนื่องตอนนี้ ${q.streak||0} ด่าน</div>${ds.map(qrow).join('')||'<div class="empty-msg">ไม่มีเควส</div>'}</div>
-    <div class="panel"><h2>🗓️ เควสรายเดือน</h2><div class="note">รีเซ็ตวันที่ 1 ของเดือน · ส่งปูน/เหล็กเส้นได้ตอนเจอทหารผ่านศึกลึกลับ</div>${ms.map(qrow).join('')||'<div class="empty-msg">ไม่มีเควส</div>'}</div>
+    <div class="panel"><h2>🗓️ เควสรายเดือน</h2><div class="note">รีเซ็ตวันที่ 1 ของเดือน · ส่งปูน/เหล็กเส้นได้ตอนเจอทหารผ่านศึกลึกลับ</div>${ms.map(qrow).join('')||'<div class="empty-msg">ไม่มีเควส</div>'}
+      ${(()=>{ const done = ms.filter(qd=>questClaimed(qd)).length, all = ms.length, got = !!q.mc.__all, ok = all>0 && done>=all;
+        return `<div class="part-pick-item" style="border-color:var(--accent);background:rgba(224,168,58,.08);"><div style="flex:1;min-width:0;">🏅 <b>โบนัสทำเควสรายเดือนครบทุกอัน</b> ${done}/${all}
+          <div class="note" style="margin:2px 0 0;">👑 กล่อง VIP 1 วัน (ใช้เอง หรือขายในตลาดได้)</div>${bar(done, Math.max(1,all))}</div>
+          <button class="${ok&&!got?'diamond':'ghost'}" onclick="claimMonthlyAll()" ${ok&&!got?'':'disabled'}>${got?'รับแล้ว':ok?'รับ':'ยังไม่ครบ'}</button></div>`; })()}</div>
     <div class="panel"><h2>🏗️ เควสเซิร์ฟเวอร์ (ทั้งเซิร์ฟช่วยกัน)</h2>
       <div class="note">ทั้งเซิร์ฟช่วยกันส่งปูนและเหล็กเส้นให้ทหารผ่านศึกลึกลับให้ครบภายในเดือนนี้ → ทุกคนได้ 🎫 ${cfgSet('sq_points')} แต้ม + 💎 ${cfgSet('sq_dia')} และอัตราดรอป +${cfgSet('sq_drop_pct')}% นาน ${cfgSet('sq_drop_days')} วัน</div>
       ${sqHtml}</div>
@@ -6236,11 +6280,11 @@ function renderQuestTab(){
 // 🧭 เมนูล่างแบบใหม่ + แถบเมนูย่อย + แผ่นเมนูเพิ่มเติม
 // =====================================================================
 const NAV_GROUP = { gacha:'gacha', team:'team', dna:'team', bag:'team', battle:'battle',
-  arena:'compete', wboss:'compete', tower:'compete', bounty:'compete', rank:'compete', market:'more', guild:'more', quest:'more' };
+  arena:'compete', wboss:'compete', tower:'compete', bounty:'compete', rank:'compete', market:'more', guild:'more', quest:'more', wheel:'more' };
 const SUBNAV = {
   team:    [['team','🛡️ ตัวละคร'],['dna','🧬 DNA'],['bag','🎒 กระเป๋า']],
   compete: [['arena','⚔️ อารีน่า'],['wboss','👹 บอสโลก'],['tower','🗼 หอคอย'],['bounty','🎯 ค่าหัว'],['rank','🏆 อันดับ']],
-  more:    [['market','🏪 ตลาด'],['guild','🏰 กิล'],['quest','🎯 เควส']],
+  more:    [['market','🏪 ตลาด'],['guild','🏰 กิล'],['quest','🎯 เควส'],['wheel','🎡 กงล้อ']],
 };
 let curTab = 'gacha', lastCompete = 'arena';
 function goTab(tab){
@@ -6264,6 +6308,7 @@ function goTab(tab){
   if(tab==='wboss') wbLoad();
   if(tab==='tower') renderTower();
   if(tab==='bounty') bountyLoad();
+  if(tab==='wheel') renderWheel();
 }
 function renderSubnav(){
   const el = document.getElementById('subnav'); if(!el) return;
@@ -6449,7 +6494,8 @@ async function wbLoad(){
   } catch(e){ wbView.err = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'; }
   renderWb();
 }
-function wbBossName(per){ const names = ['ราชาซากศพ','ยักษ์จักรกลคลั่ง','จอมอสูรเพลิง','เทวทูตตกสวรรค์','จ่าฝูงกลายพันธุ์']; return names[(per||0) % names.length]; }
+function wbBossName(d){ return (d && d.boss && d.boss.name) || 'บอสโลก'; }
+function wbRounds(d){ return (d && d.boss && d.boss.rounds) || WB_MAX_ROUNDS; }
 function renderWb(){
   const el = document.getElementById('wbRoot'); if(!el) return;
   const d = wbView.data;
@@ -6458,9 +6504,10 @@ function renderWb(){
   const remain = Math.max(0, d.limit - d.used);
   const top = wbView.top && wbView.top.top ? wbView.top.top.slice(0,10).map((x,i)=>`<div class="lb-row ${x.me?'me':''}"><span>${i<3?['🥇','🥈','🥉'][i]:'#'+(i+1)} ${esc(x.n)}</span><b>${x.p.toLocaleString()}</b></div>`).join('') : '';
   el.innerHTML = `<div class="hero-card boss">
-      <div class="hero-ic">👹</div>
+      <div class="hero-ic">${esc((d.boss&&d.boss.icon)||'👹')}</div>
       <div style="flex:1;min-width:0;"><div class="note" style="margin:0;">บอสประจำสัปดาห์</div>
-        <div class="hero-num" style="font-size:20px;">${wbBossName(d.per)}</div>
+        <div class="hero-num" style="font-size:20px;">${esc(wbBossName(d))}</div>
+        <div class="note" style="margin:0;">${d.boss?`${(FACTIONS[d.boss.faction]||{}).icon||''} ${(FACTIONS[d.boss.faction]||{}).name||''} · เกรด ${d.boss.grade} · Lv.${d.boss.lv}`:''}</div>
         <div class="bossbar"><div style="width:${pct}%"></div></div>
         <div class="note" style="margin:2px 0 0;">${d.deadAt ? '💀 ถูกปราบแล้ว! ตีต่อได้เพื่อเก็บดาเมจลงอันดับ' : `❤️ ${d.hp.toLocaleString()} / ${d.max.toLocaleString()}`} · เกิดใหม่ใน ${lbFmtLeft(d.endsAt - Date.now())}</div></div>
     </div>
@@ -6470,16 +6517,17 @@ function renderWb(){
         <div><span>ดาเมจของคุณ</span><b>${(d.myDmg||0).toLocaleString()}</b></div>
         <div><span>รางวัลเมื่อปราบได้</span><b>💎${d.killDia} · 🪙${d.killCoin.toLocaleString()}</b></div>
       </div>
-      <button class="primary big" style="width:100%;margin-top:10px;" onclick="wbFight()" ${remain?'':'disabled'}>⚔️ ตีบอส (${WB_MAX_ROUNDS} รอบ)</button>
-      <div class="note">ใช้ทีมที่ยืนยันไว้ เลือดเต็ม ไม่เสียเลือดจริง · สู้ได้สูงสุด ${WB_MAX_ROUNDS} รอบหรือจนทีมล้ม ดาเมจทั้งหมดหักเลือดบอสของทั้งเซิร์ฟ · บอสตาย = ทุกคนที่ร่วมตีได้รางวัล</div>
+      <button class="primary big" style="width:100%;margin-top:10px;" onclick="wbFight()" ${remain?'':'disabled'}>⚔️ ตีบอส (${wbRounds(d)} รอบ)</button>
+      <div class="note">ใช้ทีมที่ยืนยันไว้ เลือดเต็ม ไม่เสียเลือดจริง · สู้ได้สูงสุด ${wbRounds(d)} รอบหรือจนทีมล้ม ดาเมจทั้งหมดหักเลือดบอสของทั้งเซิร์ฟ · บอสตาย = ทุกคนที่ร่วมตีได้รางวัล</div>
     </div>
     <div class="panel"><h2>🏅 อันดับดาเมจสัปดาห์นี้</h2>${top||'<div class="empty-msg">ยังไม่มีใครตีบอส</div>'}
       <div style="margin-top:10px;">${gTable(['อันดับ','รางวัลรายสัปดาห์'], KILL_REWARD_TABLE.wb.map(r=>[`อันดับ ${r[0]}`, rewardTxt(r)]))}</div></div>`;
 }
-function makeWorldBossUnit(per){
-  const c = makeEnemyChar('demon','SSS', 30);
-  c.name = '👹 ' + wbBossName(per);
-  c.stats.hp = WB_FIGHT_HP; c.stats.atk = Math.round(c.stats.atk*1.3); c.stats.defFlat = Math.round(c.stats.defFlat*1.2);
+function makeWorldBossUnit(d){
+  const bc = (d && d.boss) || { faction:'demon', grade:'SSS', lv:30, atk:1.3, def:1.2, spd:1, icon:'👹' };
+  const c = makeEnemyChar(FACTIONS[bc.faction] ? bc.faction : 'demon', GRADES[bc.grade] ? bc.grade : 'SSS', bc.lv||30);
+  c.name = (bc.icon||'👹') + ' ' + wbBossName(d);
+  c.stats.hp = WB_FIGHT_HP; c.stats.atk = Math.round(c.stats.atk*(bc.atk||1)); c.stats.defFlat = Math.round(c.stats.defFlat*(bc.def||1)); c.stats.spd = Math.round(c.stats.spd*(bc.spd||1));
   c.isWarBoss = true;
   const u = makeUnit(c,'en'); u.curHp = u.maxHp = WB_FIGHT_HP; return u;
 }
@@ -6488,13 +6536,13 @@ async function wbFight(){
   if(!profile.lockedTeamIds){ showToast('ต้องยืนยันทีมก่อน'); return; }
   const d = wbView.data; if(!d) return;
   if(d.used >= d.limit){ showToast('วันนี้ตีบอสครบแล้ว'); return; }
-  startModeBattle({ type:'wb', per:d.per, maxRounds:WB_MAX_ROUNDS }, makeMyModeUnits(), [makeWorldBossUnit(d.per)], 'ruins',
-    [`👹 บอสโลก: ${wbBossName(d.per)} — ทำดาเมจให้มากที่สุดใน ${WB_MAX_ROUNDS} รอบ`]);
+  startModeBattle({ type:'wb', per:d.per, maxRounds:wbRounds(d) }, makeMyModeUnits(), [makeWorldBossUnit(d)], 'ruins',
+    [`👹 บอสโลก: ${esc(wbBossName(d))} — ทำดาเมจให้มากที่สุดใน ${wbRounds(d)} รอบ`]);
 }
 async function wbFinish(result, mb){
   const boss = battleUnits.find(u=>u.side==='en');
   const dmg = boss ? Math.max(0, Math.round(boss.maxHp - Math.max(0, boss.curHp))) : 0;
-  logLine('sys', result==='timeout' ? `⏱️ ครบ ${WB_MAX_ROUNDS} รอบ` : result==='quit' ? '🏳️ ออกจากการต่อสู้' : '💀 ทีมล้มหมดแล้ว');
+  logLine('sys', result==='timeout' ? `⏱️ ครบ ${mb.maxRounds} รอบ` : result==='quit' ? '🏳️ ออกจากการต่อสู้' : '💀 ทีมล้มหมดแล้ว');
   logLine('sys', `💥 ดาเมจที่ทำได้: ${dmg.toLocaleString()}`);
   const r = await onlineRpc({ a:'wbHit', t:ON.token, dmg });
   if(r && r.ok){ wbView.data = r; logLine('sys', r.killed ? '🎉🎉 คุณปิดบัญชีบอสโลกได้! ทุกคนที่ร่วมตีจะได้รางวัล' : r.deadAt ? '💀 บอสถูกปราบไปแล้ว — ดาเมจนับเข้าอันดับ' : `👹 เลือดบอสเหลือ ${r.hp.toLocaleString()} / ${r.max.toLocaleString()}`); if(r.killed) setTimeout(onlineTick, 1500); }
@@ -6647,6 +6695,77 @@ async function bountyPlace(){
 }
 
 // =====================================================================
+// 🎡 กงล้อลุ้นโชค — หมุนละ 1,000 เหรียญ
+// =====================================================================
+const WHEEL_COST = 1000;
+const WHEEL_PRIZES = [   // w = น้ำหนักโอกาส (รวม 100 = เปอร์เซ็นต์)
+  { id:'c50',   label:'50',    icon:'🪙', coin:50,   w:30,  color:'#3b4a42' },
+  { id:'c100',  label:'100',   icon:'🪙', coin:100,  w:22,  color:'#465a4f' },
+  { id:'c200',  label:'200',   icon:'🪙', coin:200,  w:18,  color:'#3b4a42' },
+  { id:'c300',  label:'300',   icon:'🪙', coin:300,  w:12,  color:'#465a4f' },
+  { id:'c500',  label:'500',   icon:'🪙', coin:500,  w:9,   color:'#5a6b3a' },
+  { id:'c800',  label:'800',   icon:'🪙', coin:800,  w:5,   color:'#6b6a32' },
+  { id:'c1000', label:'1,000', icon:'🪙', coin:1000, w:3.5, color:'#8a6d2a' },
+  { id:'dia',   label:'500',   icon:'💎', dia:500,   w:0.3, color:'#2f6f8f' },
+  { id:'dna',   label:'x3',    icon:'🧬', dnaBox:3,  w:0.2, color:'#8a3f6e' },
+];
+let wheelSpinning = false, wheelAngle = 0;
+function wheelPick(){ const tot = WHEEL_PRIZES.reduce((a,p)=>a+p.w,0); let r = Math.random()*tot; for(const p of WHEEL_PRIZES){ if(r < p.w) return p; r -= p.w; } return WHEEL_PRIZES[0]; }
+function renderWheel(){
+  const el = document.getElementById('wheelRoot'); if(!el || !profile) return;
+  const n = WHEEL_PRIZES.length, seg = 360/n;
+  const grad = WHEEL_PRIZES.map((p,i)=>`${p.color} ${i*seg}deg ${(i+1)*seg}deg`).join(',');
+  const labels = WHEEL_PRIZES.map((p,i)=>`<div class="wl" style="transform:rotate(${i*seg+seg/2}deg)"><span>${p.icon}<br>${p.label}</span></div>`).join('');
+  const st = profile.wheelStats || { spins:0 };
+  el.innerHTML = `<div class="panel" style="text-align:center;">
+      <h2>🎡 กงล้อลุ้นโชค</h2>
+      <div class="note">หมุนละ ${WHEEL_COST.toLocaleString()}🪙 · รางวัลใหญ่ 💎 500 และ 🧬 กล่องสุ่ม DNA เพชร 3 กล่อง</div>
+      <div class="wheel-wrap"><div class="wheel-ptr">▼</div>
+        <div class="wheel" id="wheelDisc" style="background:conic-gradient(${grad});transform:rotate(${wheelAngle}deg);">${labels}<div class="wheel-hub">🎯</div></div></div>
+      <div class="row" style="justify-content:center;gap:8px;">
+        <button class="primary big" style="flex:0 1 200px;" onclick="spinWheel(1)" ${profile.coins<WHEEL_COST?'disabled':''}>หมุน 1 ครั้ง · ${WHEEL_COST.toLocaleString()}🪙</button>
+        <button class="ghost big" style="flex:0 1 160px;" onclick="spinWheel(10)" ${profile.coins<WHEEL_COST*10?'disabled':''}>หมุน 10 · ${(WHEEL_COST*10).toLocaleString()}🪙</button>
+      </div>
+      <div id="wheelResult" class="note" style="min-height:20px;margin-top:8px;"></div>
+      <div class="note">หมุนไปแล้วทั้งหมด ${st.spins.toLocaleString()} ครั้ง</div>
+    </div>
+    <div class="panel"><h2>🎁 รางวัลและโอกาส</h2>${gTable(['รางวัล','โอกาส'], WHEEL_PRIZES.map(p=>[p.dnaBox?`🧬 กล่องสุ่ม DNA เพชร x${p.dnaBox}`:p.dia?`💎 ${p.dia}`:`🪙 ${p.coin.toLocaleString()}`, p.w+'%']))}
+      <div class="note">กล่องสุ่ม DNA เพชรเข้ากระเป๋า เปิดได้ทีหลัง หรือขายในตลาด</div></div>`;
+}
+async function spinWheel(times){
+  if(wheelSpinning) return;
+  if(battleActive){ showToast('ระหว่างต่อสู้ใช้ไม่ได้'); return; }
+  const cost = WHEEL_COST*times;
+  if(profile.coins < cost){ showToast('เหรียญไม่พอ'); return; }
+  profile.coins -= cost;
+  const got = []; for(let i=0;i<times;i++) got.push(wheelPick());
+  let coin = 0, dia = 0, box = 0;
+  got.forEach(p=>{ coin += p.coin||0; dia += p.dia||0; box += p.dnaBox||0; });
+  profile.coins += coin; profile.diamonds += dia;
+  if(box) questGive('dna_box', box);
+  profile.wheelStats = { spins:((profile.wheelStats||{}).spins||0) + times };
+  await saveProfile(); if(box){ await saveBagItems(); await saveWarehouseItems(); }
+  renderHud();
+  // แอนิเมชัน: หมุนไปหยุดที่รางวัลสุดท้าย (รางวัลที่ดีที่สุดถ้าหมุน 10)
+  const show = times>1 ? got.slice().sort((a,b)=>WHEEL_PRIZES.indexOf(b)-WHEEL_PRIZES.indexOf(a))[0] : got[0];
+  const idx = WHEEL_PRIZES.indexOf(show), seg = 360/WHEEL_PRIZES.length;
+  const target = 360 - (idx*seg + seg/2) + (Math.random()-0.5)*seg*0.6;
+  wheelAngle = wheelAngle - (wheelAngle % 360) + 360*5 + target;
+  wheelSpinning = true;
+  const disc = document.getElementById('wheelDisc');
+  if(disc){ disc.style.transition = 'transform 3.2s cubic-bezier(.15,.85,.2,1)'; disc.style.transform = `rotate(${wheelAngle}deg)`; }
+  await new Promise(r=>setTimeout(r, disc ? 3300 : 0));
+  wheelSpinning = false;
+  const big = got.filter(p=>p.dia||p.dnaBox);
+  const txt = (coin?`🪙 ${coin.toLocaleString()}`:'') + (dia?` · 💎 ${dia}`:'') + (box?` · 🧬 กล่อง DNA x${box}`:'');
+  renderWheel();
+  const res = document.getElementById('wheelResult');
+  if(res) res.innerHTML = `${big.length?'🎉 <b style="color:var(--accent)">รางวัลใหญ่!</b> ':''}ได้ ${txt} ${times>1?`(จาก ${times} ครั้ง)`:''}`;
+  showToast(`🎡 ได้ ${txt}`);
+  renderAll();
+}
+
+// =====================================================================
 // 💬 แชท
 // =====================================================================
 let chat = { ch:'all', msgs:{ all:[] }, since:0, unread:0, open:false, timer:null, busy:false };
@@ -6785,6 +6904,10 @@ wbFight = guardAsync(wbFight);
 towerStart = guardAsync(towerStart);
 towerHeal = guardAsync(towerHeal);
 bountyPlace = guardAsync(bountyPlace);
+openDnaBox = guardAsync(openDnaBox);
+useVipBox = guardAsync(useVipBox);
+spinWheel = guardAsync(spinWheel);
+claimMonthlyAll = guardAsync(claimMonthlyAll);
 
 // ---------- 🪙 → รูปเหรียญ: แปลงทุกที่ที่มีอีโมจิเหรียญในหน้าเกมเป็นรูปเหรียญอัตโนมัติ ----------
 const COIN_IMG = 'data:image/webp;base64,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';
