@@ -897,7 +897,7 @@ async function redeemTopupCode(codeArg){ return redeemTopupCodeCore(codeArg); }
 // =========================================================
 //  🛠️ โหมดผู้พัฒนา — เปิดได้เฉพาะบัญชีที่อยู่ในรายชื่อผู้พัฒนาบนเซิร์ฟเวอร์ (Code.gs / แผ่นงาน Developers)
 // =========================================================
-const DEV = { on:false, god:false, dmgMult:1, warShift:0, forceWornLoss:false, forceWarGear:false };
+const DEV = { on:false, god:false, dmgMult:1, warShift:0, forceWornLoss:false, forceWarGear:false, forceVet:false, forceGold:false, forceBuild:false, sqBonus:false };
 // เวลาที่ระบบสงครามกิลใช้ (โหมดผู้พัฒนาเลื่อนเวลาเพื่อทดสอบสงครามได้ เฉพาะเครื่องตัวเอง)
 function warNow(){ return Date.now() + (DEV.on ? DEV.warShift : 0); }
 function devAllowed(){ return isOnlineMode() && !!ON.dev; }
@@ -934,7 +934,7 @@ function renderDevPanel(){
     </div>
     <div class="panel"><h2>🎁 เสกของ</h2>
       <div class="row" style="align-items:center;"><select id="devItem" ${sel}>${itemOpts}</select>
-        <select id="devItemQty" style="flex:0 0 70px;background:var(--bg-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px;font-size:12px;"><option>1</option><option>5</option><option>10</option><option>50</option></select>
+        <select id="devItemQty" style="flex:0 0 70px;background:var(--bg-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px;font-size:12px;"><option>1</option><option>5</option><option>10</option><option>50</option><option>100</option></select>
         <button class="primary" style="flex:0 0 auto;" onclick="devDo('item')">เพิ่ม</button></div>
       <div class="row" style="align-items:center;margin-top:6px;"><select id="devDnaGrade" ${sel}>${gradeOpts}</select>
         <button class="primary" style="flex:0 0 auto;" onclick="devDo('dna')">+ แพ็ค DNA</button></div>
@@ -943,6 +943,31 @@ function renderDevPanel(){
         <button class="primary" style="flex:0 0 auto;" onclick="devDo('part')">+ อวัยวะ</button></div>
       <div class="row" style="align-items:center;margin-top:6px;"><select id="devGearSlot" ${sel}>${gearOpts}</select>
         <button class="primary" style="flex:0 0 auto;" onclick="devDo('gear')">+ อุปกรณ์</button></div>
+    </div>
+    <div class="panel"><h2>🎖️ ทหารผ่านศึก · ทองแท่ง · ดรอป</h2>
+      ${devBtn(veteranActive()?'🎖️ ทหารอยู่แล้ว (เปิดร้าน)':'🎖️ เรียกทหารผ่านศึกลึกลับ',"devDo('vetSpawn')",'primary')}${devBtn('👋 ไล่ทหารกลับ',"devDo('vetGone')")}
+      ${devBtn(`🎲 ทหารโผล่หลังชนะ: ${DEV.forceVet?'100%':'ปกติ'}`,"devDo('forceVet')", DEV.forceVet?'primary':'')}
+      ${devBtn(`🥇 ทองแท่งดรอป (ซากเมือง/ท่อน้ำ): ${DEV.forceGold?'100%':'ปกติ'}`,"devDo('forceGold')", DEV.forceGold?'primary':'')}
+      ${devBtn(`🧱 ปูน/เหล็กเส้นดรอป: ${DEV.forceBuild?'100%':'ปกติ'}`,"devDo('forceBuild')", DEV.forceBuild?'primary':'')}
+      ${devBtn('🔁 รีเซ็ตลิมิตทองแท่ง (ร้าน/ทหาร)',"devDo('goldReset')")}
+      ${devBtn('📡 +1 เรดาห์ทุกด่าน',"devDo('radars')")}
+      <div class="note">เสกปูน/เหล็กเส้น/ทองแท่ง/ใบแปลน ได้จากช่อง "เสกของ" ด้านบน</div>
+    </div>
+    <div class="panel"><h2>🎯 เควส · แต้มกิจกรรม</h2>
+      <div style="font-size:12px;">แต้มกิจกรรม: <b>${(profile.eventPts||0).toLocaleString()}</b> · ชนะต่อเนื่อง ${(questState().streak||0)}</div>
+      ${devBtn('🎫 +100 แต้ม',"devDo('pts',100)")}${devBtn('🎫 +1,000 แต้ม',"devDo('pts',1000)")}
+      ${devBtn('✅ ทำเควสรายวันครบ',"devDo('qDay')",'primary')}${devBtn('✅ ทำเควสรายเดือนครบ',"devDo('qMonth')",'primary')}
+      ${devBtn('🔄 รีเซ็ตเควส (ความคืบหน้า+การรับ)',"devDo('qReset')")}
+      ${devBtn(`🏗️ โบนัสดรอปเควสเซิร์ฟ (ทดสอบ): ${DEV.sqBonus?'เปิด':'ปิด'}`,"devDo('sqBonus')", DEV.sqBonus?'primary':'')}
+      ${devBtn('🔃 โหลดค่าตั้งจากชีทใหม่',"devDo('cfgReload')")}
+      <div class="note">โบนัสดรอปเควสเซิร์ฟเวอร์เปิด/ปิดเฉพาะเครื่องนี้ (เควสเซิร์ฟจริงนับจากของที่ส่งให้ทหาร) · ค่าในชีทมีแคช ~1 นาที</div>
+    </div>
+    <div class="panel"><h2>📡 ดักผู้เล่น · VIP</h2>
+      <div style="font-size:12px;">วันนี้ดักไป ${pvpTodayCount()} ครั้ง ${isRed()?'<b style="color:var(--bad)">🟥 ตัวแดง</b>':''} · VIP: ${isVip()?'เปิด':'ปิด'}</div>
+      ${devBtn('🟥 ทำเป็นตัวแดง',"devDo('red')")}${devBtn('⬜ รีเซ็ตจำนวนดักวันนี้',"devDo('pvpReset')")}
+      ${devBtn('📍 ประกาศว่าอยู่ด่านโรงเรียน (ให้บัญชีอื่นดักได้)',"devDo('pvpHere')")}
+      ${devBtn('👑 +30 วัน VIP',"devDo('vip')",'diamond')}${devBtn('👑 ยกเลิก VIP',"devDo('vipOff')")}
+      <div class="note">ตัวแดงมีผลเฉพาะเครื่องนี้จนกว่าจะส่ง tick (เซิร์ฟเวอร์นับจากการดักจริง) · โล่ 60 นาทีอยู่บนเซิร์ฟเวอร์</div>
     </div>
     <div class="panel"><h2>⚔️ การต่อสู้ (เฉพาะเครื่องนี้)</h2>
       ${devBtn(`🛡️ อมตะ: ${DEV.god?'เปิด':'ปิด'}`,"devDo('god')", DEV.god?'primary':'')}
@@ -1021,6 +1046,27 @@ async function devDo(kind, arg){
     }
     case 'warGear': DEV.forceWarGear = !DEV.forceWarGear; msg = `บอสกิลดรอปอุปกรณ์: ${DEV.forceWarGear?'100%':'ปกติ'}`; break;
     case 'warReal': DEV.warShift = 0; msg = 'กลับเวลาจริงแล้ว'; break;
+    case 'vetSpawn': if(!veteranActive()){ profile.veteranUntil = Date.now() + VETERAN_STAY_MS; questAdd('vet',1); } await saveProfile(); renderAll(); closeDevPanel(); openVeteranShop(); return;
+    case 'vetGone': profile.veteranUntil = 0; msg='ทหารผ่านศึกกลับไปแล้ว'; break;
+    case 'forceVet': DEV.forceVet = !DEV.forceVet; msg = `ทหารโผล่: ${DEV.forceVet?'100% (ด่านโรงเรียน/ค่ายทหาร/ซากเมือง)':'ปกติ'}`; break;
+    case 'forceGold': DEV.forceGold = !DEV.forceGold; msg = `ทองแท่งดรอป: ${DEV.forceGold?'100%':'ปกติ'}`; break;
+    case 'forceBuild': DEV.forceBuild = !DEV.forceBuild; msg = `ปูน/เหล็กเส้นดรอป: ${DEV.forceBuild?'100%':'ปกติ'}`; break;
+    case 'goldReset': profile.vetGoldDay = null; profile.goldShopMonth = null; msg='ซื้อทองแท่งได้อีกครั้งแล้ว'; break;
+    case 'radars': { let ok = true; PVP_STAGES.forEach(st=>{ if(!addItem('radar_'+st,1)) ok = false; }); await saveBagItems(); await saveWarehouseItems(); msg = ok ? '+1 เรดาห์ทุกด่าน' : 'กระเป๋า+ตู้เซฟเต็ม ได้ไม่ครบ'; break; }
+    case 'pts': profile.eventPts = (profile.eventPts||0) + arg; msg = `+${arg.toLocaleString()} แต้มกิจกรรม`; break;
+    case 'qDay': case 'qMonth': {
+      const q = questState(), t = kind==='qDay' ? 'd' : 'm';
+      GCFG.quests.filter(x=>x.type===t).forEach(x=>{ const m = x.id.slice(2); q[t][m] = Math.max(q[t][m]||0, x.target); });
+      msg = `ทำเควส${t==='d'?'รายวัน':'รายเดือน'}ครบแล้ว ไปกดรับที่แท็บเควส`; break;
+    }
+    case 'qReset': profile.quests = null; questState(); msg='รีเซ็ตเควสแล้ว'; break;
+    case 'sqBonus': DEV.sqBonus = !DEV.sqBonus; msg = DEV.sqBonus ? `เปิดโบนัสดรอป +${cfgSet('sq_drop_pct')}% (เฉพาะเครื่องนี้)` : 'ปิดโบนัสดรอปทดสอบแล้ว'; break;
+    case 'cfgReload': await loadGameCfg(); msg='โหลดค่าตั้งจากชีทแล้ว'; break;
+    case 'red': profile.pvpDay = thDayKey(); profile.pvpCount = PVP_RED_AFTER + 1; msg='เป็นตัวแดงแล้ว (เฉพาะเครื่องนี้)'; break;
+    case 'pvpReset': profile.pvpDay = thDayKey(); profile.pvpCount = 0; msg='รีเซ็ตจำนวนดักวันนี้แล้ว (เฉพาะเครื่องนี้)'; break;
+    case 'pvpHere': profile.lastFarm = { stage:'school', ts:Date.now() }; await saveProfile(); await onlineTick(); msg='ประกาศอยู่ด่านโรงเรียน 15 นาทีแล้ว'; break;
+    case 'vip': profile.vipUntil = Math.max(Date.now(), profile.vipUntil||0) + 30*86400000; msg='+30 วัน VIP'; break;
+    case 'vipOff': profile.vipUntil = 0; msg='ยกเลิก VIP แล้ว'; break;
     case 'warAttempts': profile.warWindowId = warWindowId(); profile.warAttemptsUsed = 0; profile.warExtraBought = 0; msg='รีเซ็ตสิทธิ์ลงสู้แล้ว'; break;
     case 'warClear': {
       if(!confirm('ลบดาเมจสงครามและผู้ครองโซนทั้งหมดของทุกคนในเซิร์ฟเวอร์?')) return;
@@ -1190,7 +1236,7 @@ function renderGuide(){
 
   secs.push(gSec('📡 ดักผู้เล่น · ทหารผ่านศึก · ทองแท่ง', `
     <b>🎖️ ทหารผ่านศึกลึกลับ:</b> สุ่มโผล่หลังชนะด่าน (โรงเรียน 1% · ค่ายทหาร 2% · ซากเมือง 3%) อยู่ 30 นาที — ปุ่มขึ้นในแท็บต่อสู้/ตลาด
-    ${gTable(['สินค้า','ราคา'],[['🧬 กล่องสุ่ม DNA เพชร','📦 กล่องเก็บเงิน 1 กล่อง (ต้องอยู่ในกระเป๋า)'],['📡 เรดาห์ โรงเรียน / ค่ายทหาร / ซากเมือง','2,500 / 5,000 / 7,500🪙 (ใช้ได้ 3 ครั้ง)'],['📦 บริการฝากเงินเข้ากล่อง','10,000🪙 → กล่องเก็บเงิน 1 กล่อง (เปิดได้ 5,000)'],['🥇 ทองแท่ง','📦 กล่องเก็บเงิน 5 กล่อง · วันละ 1 ครั้ง']])}
+    ${gTable(['สินค้า','ราคา'],[['🧬 กล่องสุ่ม DNA เพชร','📦 กล่องเก็บเงิน 1 กล่อง (ต้องอยู่ในกระเป๋า)'],['📡 เรดาห์ โรงเรียน / ค่ายทหาร / ซากเมือง',`${Object.values(RADAR_PRICES).map(x=>x.toLocaleString()).join(' / ')}🪙 (ใช้ได้ ${RADAR_USES} ครั้ง แล้วหมดไป)`],['📦 บริการฝากเงินเข้ากล่อง','10,000🪙 → กล่องเก็บเงิน 1 กล่อง (เปิดได้ 5,000)'],['🥇 ทองแท่ง','📦 กล่องเก็บเงิน 5 กล่อง · วันละ 1 ครั้ง']])}
     <b>🥇 ทองแท่ง</b> ซื้อในร้านได้ ${GOLD_SHOP_PRICE}💎 (เดือนละ 1 ครั้ง) · ใช้แลกอาวุธ/ชุดเกราะพิเศษที่จะมาในอนาคต<br>
     <b>📡 ดักผู้เล่น:</b> ใช้เรดาห์ของด่านนั้นสแกนหาผู้เล่นที่ลงฟาร์มด่านนั้นในช่วง 15 นาทีล่าสุด · เลเวลห่างไม่เกิน ±5 · ทีมอีกฝ่ายสู้ด้วย AI (เลือดเริ่มอย่างน้อย 30%)<br>
     • ชนะ = ได้ของที่อีกฝ่ายตก 100% (กติกาเดียวกับโทษการตาย) + 1 คิลในลีดเดอร์บอร์ดการสังหาร · แพ้ = โดนโทษการตายเหมือนปกติ<br>
@@ -5394,8 +5440,8 @@ async function mktSell(key){
 // =====================================================================
 const VETERAN_CHANCE = { school:1, campground:2, ruins:3 };
 const VETERAN_STAY_MS = 30*60000;
-const RADAR_PRICES = { school:2500, campground:5000, ruins:7500 };
-const RADAR_USES = 3;
+const RADAR_PRICES = { school:500, campground:1500, ruins:2500 };
+const RADAR_USES = 1;   // ซื้อ 1 อัน = ดักได้ 1 ครั้ง แล้วหมดไป
 const VET_MONEYBOX_SERVICE = 10000;   // ฝากเงิน 10,000 เหรียญ → ได้กล่องเก็บเงิน 1 กล่อง (เปิดได้ 5,000)
 const VET_GOLD_COST_BOX = 5;          // ทองแท่ง = กล่องเก็บเงิน 5 กล่อง (จำกัดวันละ 1)
 const GOLD_SHOP_PRICE = 1500;         // ทองแท่งในร้าน = 1500 เพชร (จำกัดเดือนละ 1)
@@ -5403,7 +5449,7 @@ function thMonthKey(){ return thDayKey().slice(0,7); }
 function veteranActive(){ return (profile && profile.veteranUntil||0) > Date.now(); }
 function maybeSpawnVeteran(stageKey){
   const c = VETERAN_CHANCE[stageKey];
-  if(!c || veteranActive() || Math.random()*100 >= c) return false;
+  if(!c || veteranActive() || Math.random()*100 >= ((DEV.on && DEV.forceVet) ? 100 : c)) return false;
   profile.veteranUntil = Date.now() + VETERAN_STAY_MS;
   logLine('sys', `🎖️ ทหารผ่านศึกลึกลับปรากฏตัว! เปิดร้านได้ ${VETERAN_STAY_MS/60000} นาที (ปุ่มในแท็บต่อสู้/ตลาด)`);
   showToast('🎖️ ทหารผ่านศึกลึกลับปรากฏตัว!');
@@ -5845,7 +5891,7 @@ async function exchangePoints(id){
   showToast(`🎟️ แลกได้ ${msg}`);
 }
 // ---------- เควสเซิร์ฟเวอร์ + โบนัสดรอป ----------
-function sqBonusPct(){ return (profile && (profile.sqBonusUntil||0) > Date.now()) ? (profile.sqBonusPct||cfgSet('sq_drop_pct')) : 0; }
+function sqBonusPct(){ if(DEV.on && DEV.sqBonus) return cfgSet('sq_drop_pct'); return (profile && (profile.sqBonusUntil||0) > Date.now()) ? (profile.sqBonusPct||cfgSet('sq_drop_pct')) : 0; }
 async function vetDonate(item){
   if(!veteranActive()){ showToast('ทหารผ่านศึกลึกลับจากไปแล้ว'); return; }
   if(!isOnlineMode() || !ON.token){ showToast('ต้องเล่นแบบออนไลน์'); return; }
@@ -5874,14 +5920,14 @@ async function vetSellGold(){
 // ---------- ของดรอปใหม่ (เรียกจาก endBattle ตอนชนะ PvE) ----------
 function questExtraDrops(stageKey, dropLines){
   const mult = 1 + sqBonusPct()/100;
-  const bc = cfgSet('build_drop_'+stageKey) * mult;
+  const bc = (DEV.on && DEV.forceBuild) ? 100 : cfgSet('build_drop_'+stageKey) * mult;
   if(bc>0 && Math.random()*100 < bc){
     const item = Math.random()<0.5 ? 'cement' : 'rebar';
     const n = 1 + Math.floor(Math.random()*Math.max(1, cfgSet('build_drop_max')));
     if(addItem(item, n)) dropLines.push(`${ITEM_DEFS[item].icon} ${ITEM_DEFS[item].name} x${n}`);
     else dropLines.push(`⚠️ กระเป๋า+คลังเต็มหมด ไม่ได้รับ ${ITEM_DEFS[item].name}`);
   }
-  const gc = (stageKey==='ruins' ? cfgSet('gold_drop_ruins') : stageKey==='pipe' ? cfgSet('gold_drop_pipe') : 0) * mult;
+  const gc = (DEV.on && DEV.forceGold && (stageKey==='ruins'||stageKey==='pipe')) ? 100 : (stageKey==='ruins' ? cfgSet('gold_drop_ruins') : stageKey==='pipe' ? cfgSet('gold_drop_pipe') : 0) * mult;
   if(gc>0 && Math.random()*100 < gc){
     if(addItem('gold_bar',1)) dropLines.push(`🥇 ทองแท่ง x1 !!! (โอกาสหายากมาก)`);
     else { warehouseItems.gold_bar = (warehouseItems.gold_bar||0)+1; dropLines.push(`🥇 ทองแท่ง x1 !!! (เก็บเข้าตู้เซฟ)`); }
