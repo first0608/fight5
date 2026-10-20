@@ -692,9 +692,12 @@
    ========================================================= */
 const ONLINE_API_URL = 'https://script.google.com/macros/s/AKfycbx8uVFYWVV5JdpY8toRZMummV4mZhNft3SrX_hqOiJrPkNMpEdVsdwFNpEOcOued7vc/exec';   // ← ใส่ลิงก์ Web App (…/exec) ตรงนี้ ถ้าจะแจกไฟล์ให้เปิดนอก Apps Script
 
-function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
-function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
-function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+// ช่องบัญชี: เปิดลิงก์ ...?slot=ชื่อ เพื่อให้แท็บนั้นจำล็อกอินแยกจากแท็บอื่น (เล่นหลายบัญชีในเบราว์เซอร์เดียวกันได้)
+const LS_SLOT = (()=>{ try{ const v = new URLSearchParams(location.search).get('slot'); return v && /^[A-Za-z0-9_-]{1,20}$/.test(v) ? v : ''; }catch(e){ return ''; } })();
+function lsKey(k){ return LS_SLOT ? k + '@' + LS_SLOT : k; }
+function lsGet(k){ try{ return localStorage.getItem(lsKey(k)); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(lsKey(k),v); }catch(e){} }
+function lsDel(k){ try{ localStorage.removeItem(lsKey(k)); }catch(e){} }
 
 const ON = {
   mode: (typeof google!=='undefined' && google.script && google.script.run) ? 'gas'
@@ -1375,6 +1378,7 @@ function renderGuide(){
     <b>🗼 หอคอยไม่รู้จบ:</b> ปีนวันละ ${cfgSet('tower_daily')} รอบ เลือดต่อเนื่องทุกชั้น (ใช้น้ำยาระหว่างชั้นได้) · ทุก 5 ชั้นได้เหรียญ ทุก 10 ชั้นได้เพชร (ครั้งแรกของเดือน) · อันดับชั้นสูงสุดรายเดือน<br>
     <b>☠️ ล่านักล่า:</b> ดักคนที่เคยดักคนอื่นสำเร็จ แล้วชนะ = ได้ 💎 ${cfgSet('pvp_hunt_dia')} ต่อ 1 คนที่เขาล่ามา (สูงสุด ${cfgSet('pvp_hunt_cap')}💎) แล้วนับของเขาใหม่จาก 0<br>
     <b>🎯 ค่าหัว:</b> ตั้งค่าหัวผู้เล่นด้วยเพชร (ขั้นต่ำ ${cfgSet('bounty_min')}💎) · ตัวแดงโดนระบบตั้งให้อัตโนมัติ · ใครดักเป้าหมายชนะ ได้ค่าหัวทั้งหมด<br>
+    <b>🏰 ครองโซนประจำสัปดาห์:</b> กิลที่ครองแต่ละโซนได้นานที่สุดในสัปดาห์ สมาชิกทุกคนได้เพชร+เหรียญ+แต้มกิล และกิลได้ EXP (ดูในหน้าอันดับ → ครองโซน)<br>
     <b>🏗️ อันดับผู้ช่วยเควส:</b> ส่งปูน/เหล็กเส้นให้ทหารมากที่สุดในเดือน ท็อป 10 ได้รางวัล<br>
     <b>💬 แชท:</b> ปุ่ม 💬 มุมขวาล่าง คุยได้ทั้งเซิร์ฟ และในกิล`));
   secs.push(gSec('🎯 เควส · แต้มกิจกรรม · เควสเซิร์ฟเวอร์', `
@@ -4284,6 +4288,7 @@ async function loadLedger(gid){
     if(e.gearOut) delete objMap[e.gearOut];
     if(e.objOut) delete objMap[e.objOut];
     if(e.pid && e.pts) t.pts[e.pid] = (t.pts[e.pid]||0) + (Number(e.pts)||0);
+    if(e.gexp) t.expEarned += Number(e.gexp)||0;   // EXP กิลจากรางวัลครองโซนรายสัปดาห์
     if(e.t==='upgrade' && GUILD_UPGRADES[e.stat]){ t.upg[e.stat] = (t.upg[e.stat]||0) + 1; t.expSpent += Number(e.cost)||0; }
   });
   // ของที่อยู่ในคลังเกิน 3 วัน → หายไปกลายเป็น EXP กิล (เท่าราคาแต้มของชิ้นนั้น)
@@ -4968,6 +4973,7 @@ function guildEntryText(e){
   if(e.t==='donate') return `🎁 ${n} บริจาค ${num(e.dia)?num(e.dia)+'💎':''}${num(e.coin)?num(e.coin)+'🪙':''}${e.obj?esc(guildObjName(e.obj)):''} (+${num(e.pts)} แต้ม)`;
   if(e.t==='wardrop') return `🎁 ${n} ตีบอส${esc(zoneName(e.zone))} ได้ ${e.obj?esc(guildObjName(e.obj)):'อุปกรณ์'} เข้าคลังกิล`;
   if(e.t==='loot') return `💀 ${n} พ่ายแพ้ที่${esc(zoneName(e.zone))} — ${e.obj?esc(guildObjName(e.obj)):num(e.dia)?num(e.dia)+'💎':num(e.coin)?num(e.coin)+'🪙':'ของ'} ตกเข้าคลังกิล`;
+  if(e.t==='warweek') return `🏆 ${n} รับรางวัลครองโซน${esc(zoneName(e.zone))}นานสุดประจำสัปดาห์ (+${num(e.pts)} แต้ม${num(e.gexp)?` · EXP กิล +${num(e.gexp)}`:''})`;
   if(e.t==='war') return `⚔️ ${n} ตีบอส${esc(zoneName(e.zone))} ${num(e.dmg).toLocaleString()} ดาเมจ (+${num(e.pts)} แต้ม)`;
   if(e.t==='redeem') return `🛒 ${n} แลก ${esc(e.what||'')} (${num(e.pts)} แต้ม)`;
   if(e.t==='upgrade' && GUILD_UPGRADES[e.stat]) return `📈 ${n} อัปเกรด ${GUILD_UPGRADES[e.stat].label} → Lv.${num(e.lv) + (e.stat==='level'?1:0)} (−${num(e.cost).toLocaleString()} EXP)`;
@@ -5372,6 +5378,11 @@ async function onlineTick(){
     });
     if(r.rewards && r.rewards.length) questAdd('lb', r.rewards.length);
     (r.wbReward||[]).forEach(x=>{ profile.diamonds += x.dia||0; profile.coins += x.coin||0; lines.push(`👹 บอสโลก${x.name?' '+esc(x.name):''} ถูกปราบแล้ว! รางวัลผู้ร่วมตี → 💎 ${x.dia} · 🪙 ${(x.coin||0).toLocaleString()}`); });
+    for(const x of (r.warWeekReward||[])){
+      profile.diamonds += x.dia||0; profile.coins += x.coin||0;
+      if(x.pts || x.gexp) await addLedger(x.gid, { t:'warweek', pid:profile.playerId, name:profile.playerName, zone:x.zone, pts:x.pts||0, gexp:x.gexp||0 });
+      lines.push(`🏰 กิล "${esc(x.gname)}" ครอง${esc(zoneName(x.zone))}นานสุดประจำสัปดาห์ (${x.hours} ชม.) → 💎 ${x.dia} · 🪙 ${(x.coin||0).toLocaleString()} · แต้มกิล +${x.pts}${x.gexp?` · EXP กิล +${x.gexp}`:''}`);
+    }
     (r.arenaNotes||[]).forEach(x=>{ lines.push(x.win ? `🛡️ ทีมของคุณป้องกันอารีน่าจาก ${esc(x.by)} สำเร็จ (เรต +${x.d})` : `⚔️ ${esc(x.by)} ชนะทีมของคุณในอารีน่า (เรต ${x.d})`); });
     if(r.sq){
       profile.sq = { cement:r.sq.cement, rebar:r.sq.rebar, tc:r.sq.tc, tr:r.sq.tr, doneAt:r.sq.doneAt };
@@ -5410,8 +5421,15 @@ function lbFmtLeft(ms){
   if(m >= 60) return `${Math.floor(m/60)} ชม. ${m%60} นาที`;
   return `${m} นาที`;
 }
+let whView = { data:null, err:'' };
 async function lbLoad(){
   const el = document.getElementById('rankRoot'); if(!el) return;
+  if(lbView.ty==='wh'){
+    if(!isOnlineMode() || !ON.token){ whView.err='ใช้ได้เฉพาะโหมดออนไลน์'; renderRank(); return; }
+    whView.err=''; renderRank();
+    try{ const r = await onlineRpc({ a:'warHoldTop', t:ON.token }); if(r && r.ok) whView.data = r; else whView.err = (r&&r.error)||'โหลดไม่สำเร็จ'; } catch(e){ whView.err='เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'; }
+    renderRank(); return;
+  }
   if(!isOnlineMode() || !ON.token){ lbView.err='ลีดเดอร์บอร์ดใช้ได้เฉพาะโหมดออนไลน์'; renderRank(); return; }
   lbView.loading = true; lbView.err=''; renderRank();
   try{
@@ -5422,6 +5440,19 @@ async function lbLoad(){
   lbView.loading = false; renderRank();
 }
 function lbSet(ty, prev){ lbView.ty = ty; lbView.prev = !!prev; lbView.data = null; lbLoad(); }
+function renderWarHoldRank(el, chips){
+  const d = whView.data;
+  const sec = (tbl)=> WAR_ZONES.map(z=>{
+    const rows = (tbl && tbl[z]) || []; const rw = d && d.rewards[z];
+    return `<div class="panel" style="margin-bottom:10px;"><div class="hdr-row"><h2>${esc(zoneName(z))}</h2>${rw?`<span class="note" style="margin:0;">🏆 💎${rw.dia} · 🪙${rw.coin.toLocaleString()} · แต้มกิล ${rw.pts} · EXP กิล ${rw.gexp}</span>`:''}</div>
+      ${rows.length ? rows.slice(0,5).map((x,i)=>`<div class="lb-row ${profile.guildId===x.gid?'me':''}"><span>${i===0?'👑':'#'+(i+1)} ${esc(x.n||'-')}</span><b>${x.h} ชม.</b></div>`).join('') : '<div class="empty-msg" style="padding:8px;">ยังไม่มีกิลครอง</div>'}</div>`;
+  }).join('');
+  el.innerHTML = `<div class="panel"><h2>🏆 ครองโซนนานสุดประจำสัปดาห์</h2><div style="margin:6px 0;">${chips}</div>
+      <div style="margin-bottom:6px;"><button class="chip ${!lbView.prev?'on':''}" onclick="lbView.prev=false;renderRank()">สัปดาห์นี้</button><button class="chip ${lbView.prev?'on':''}" onclick="lbView.prev=true;renderRank()">สัปดาห์ที่แล้ว</button> <button class="chip" onclick="lbLoad()">🔄 รีเฟรช</button></div>
+      <div class="note">นับเวลาที่กิลครองแต่ละโซน (สงครามทุก 2 ชม. ครองต่อจนกว่าจะมีกิลอื่นชนะ) · จบทุกวันจันทร์ 00:00 น.${d?` (อีก ${lbFmtLeft(d.endsAt-Date.now())})`:''} · กิลที่ครองนานสุดของแต่ละโซน: สมาชิกทุกคนได้รางวัลอัตโนมัติ (ต้องยังอยู่ในกิลตอนรับ) และกิลได้ EXP</div>
+      ${whView.err?`<div class="empty-msg">${esc(whView.err)}</div>`:''}</div>
+    ${d ? sec(lbView.prev ? d.prev : d.cur) : (whView.err?'':'<div class="empty-msg">กำลังโหลด…</div>')}`;
+}
 function renderRank(){
   const el = document.getElementById('rankRoot'); if(!el) return;
   const d = lbView.data && lbView.data.ty===lbView.ty ? lbView.data : null;
@@ -5430,6 +5461,7 @@ function renderRank(){
   const cat = LB_CATS.find(c=>c.tys.includes(lbView.ty)) || LB_CATS[0];
   const chips = `<div class="seg" style="overflow-x:auto;scrollbar-width:none;padding-bottom:2px;">${LB_CATS.map(c=>`<button class="${c===cat?'on':''}" onclick="lbSet('${c.tys[c.id==='hunt'?1:0]}', false)">${c.label}</button>`).join('')}</div>`
     + (cat.tys.length>1 ? `<div style="margin-top:6px;">${cat.tys.map(t=>`<button class="chip ${lbView.ty===t?'on':''}" onclick="lbSet('${t}', ${lbView.prev})">${LB_LABEL[t]}</button>`).join('')}</div>` : '');
+  if(lbView.ty==='wh'){ renderWarHoldRank(el, chips); return; }
   const prevChips = `<button class="chip ${!lbView.prev?'on':''}" onclick="lbSet('${lbView.ty}', false)">รอบนี้</button><button class="chip ${lbView.prev?'on':''}" onclick="lbSet('${lbView.ty}', true)">รอบที่แล้ว</button>`;
   const pending = (profile && profile.lbPending||[]).reduce((s,x)=>s+x.p,0);
   let body = '';
@@ -6058,6 +6090,7 @@ const LB_CATS = [
   { id:'wb', label:'👹 บอสโลก', tys:['wb'] },
   { id:'tw', label:'🗼 หอคอย', tys:['tw'] },
   { id:'sqc', label:'🏗️ ผู้ช่วยเควส', tys:['sqc'] },
+  { id:'wh', label:'🏰 ครองโซน', tys:['wh'] },
 ];
 const LB_UNIT = { kd:'คิล', km:'คิล', ar:'เรต', wb:'ดาเมจ', tw:'ชั้น', sqc:'ชิ้น' };
 const LB_TITLE = { h:'การล่ารายชั่วโมง', d:'การล่ารายวัน', w:'การล่ารายสัปดาห์', m:'การล่ารายเดือน', kd:'การสังหารรายวัน', km:'การสังหารรายเดือน',
