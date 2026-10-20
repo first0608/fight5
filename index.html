@@ -949,7 +949,7 @@ function renderDevPanel(){
       ${devBtn(`🎲 ทหารโผล่หลังชนะ: ${DEV.forceVet?'100%':'ปกติ'}`,"devDo('forceVet')", DEV.forceVet?'primary':'')}
       ${devBtn(`🥇 ทองแท่งดรอป (ซากเมือง/ท่อน้ำ): ${DEV.forceGold?'100%':'ปกติ'}`,"devDo('forceGold')", DEV.forceGold?'primary':'')}
       ${devBtn(`🧱 ปูน/เหล็กเส้นดรอป: ${DEV.forceBuild?'100%':'ปกติ'}`,"devDo('forceBuild')", DEV.forceBuild?'primary':'')}
-      ${devBtn('🔁 รีเซ็ตลิมิตทองแท่ง (ร้าน/ทหาร)',"devDo('goldReset')")}
+      ${devBtn('🔁 รีเซ็ตลิมิตทองแท่ง + กล่อง DNA ทหาร',"devDo('goldReset')")}
       ${devBtn('📡 +1 เรดาห์ทุกด่าน',"devDo('radars')")}
       <div class="note">เสกปูน/เหล็กเส้น/ทองแท่ง/ใบแปลน ได้จากช่อง "เสกของ" ด้านบน</div>
     </div>
@@ -1051,7 +1051,7 @@ async function devDo(kind, arg){
     case 'forceVet': DEV.forceVet = !DEV.forceVet; msg = `ทหารโผล่: ${DEV.forceVet?'100% (ด่านโรงเรียน/ค่ายทหาร/ซากเมือง)':'ปกติ'}`; break;
     case 'forceGold': DEV.forceGold = !DEV.forceGold; msg = `ทองแท่งดรอป: ${DEV.forceGold?'100%':'ปกติ'}`; break;
     case 'forceBuild': DEV.forceBuild = !DEV.forceBuild; msg = `ปูน/เหล็กเส้นดรอป: ${DEV.forceBuild?'100%':'ปกติ'}`; break;
-    case 'goldReset': profile.vetGoldDay = null; profile.goldShopMonth = null; msg='ซื้อทองแท่งได้อีกครั้งแล้ว'; break;
+    case 'goldReset': profile.vetGoldDay = null; profile.goldShopMonth = null; profile.vetDnaWeek = null; msg='รีเซ็ตลิมิตทองแท่ง + กล่อง DNA ทหารแล้ว'; break;
     case 'radars': { let ok = true; PVP_STAGES.forEach(st=>{ if(!addItem('radar_'+st,1)) ok = false; }); await saveBagItems(); await saveWarehouseItems(); msg = ok ? '+1 เรดาห์ทุกด่าน' : 'กระเป๋า+ตู้เซฟเต็ม ได้ไม่ครบ'; break; }
     case 'pts': profile.eventPts = (profile.eventPts||0) + arg; msg = `+${arg.toLocaleString()} แต้มกิจกรรม`; break;
     case 'qDay': case 'qMonth': {
@@ -1236,7 +1236,7 @@ function renderGuide(){
 
   secs.push(gSec('📡 ดักผู้เล่น · ทหารผ่านศึก · ทองแท่ง', `
     <b>🎖️ ทหารผ่านศึกลึกลับ:</b> สุ่มโผล่หลังชนะด่าน (โรงเรียน 1% · ค่ายทหาร 2% · ซากเมือง 3%) อยู่ 30 นาที — ปุ่มขึ้นในแท็บต่อสู้/ตลาด
-    ${gTable(['สินค้า','ราคา'],[['🧬 กล่องสุ่ม DNA เพชร','📦 กล่องเก็บเงิน 1 กล่อง (ต้องอยู่ในกระเป๋า)'],['📡 เรดาห์ โรงเรียน / ค่ายทหาร / ซากเมือง',`${Object.values(RADAR_PRICES).map(x=>x.toLocaleString()).join(' / ')}🪙 (ใช้ได้ ${RADAR_USES} ครั้ง แล้วหมดไป)`],['📦 บริการฝากเงินเข้ากล่อง','10,000🪙 → กล่องเก็บเงิน 1 กล่อง (เปิดได้ 5,000)'],['🥇 ทองแท่ง','📦 กล่องเก็บเงิน 5 กล่อง · วันละ 1 ครั้ง']])}
+    ${gTable(['สินค้า','ราคา'],[['🧬 กล่องสุ่ม DNA เพชร',`📦 กล่องเก็บเงิน ${VET_DNA_COST_BOX} กล่อง (ต้องอยู่ในกระเป๋า) · สัปดาห์ละ 1 ครั้ง`],['📡 เรดาห์ โรงเรียน / ค่ายทหาร / ซากเมือง',`${Object.values(RADAR_PRICES).map(x=>x.toLocaleString()).join(' / ')}🪙 (ใช้ได้ ${RADAR_USES} ครั้ง แล้วหมดไป)`],['📦 บริการฝากเงินเข้ากล่อง','10,000🪙 → กล่องเก็บเงิน 1 กล่อง (เปิดได้ 5,000)'],['🥇 ทองแท่ง','📦 กล่องเก็บเงิน 5 กล่อง · วันละ 1 ครั้ง']])}
     <b>🥇 ทองแท่ง</b> ซื้อในร้านได้ ${GOLD_SHOP_PRICE}💎 (เดือนละ 1 ครั้ง) · ใช้แลกอาวุธ/ชุดเกราะพิเศษที่จะมาในอนาคต<br>
     <b>📡 ดักผู้เล่น:</b> ใช้เรดาห์ของด่านนั้นสแกนหาผู้เล่นที่ลงฟาร์มด่านนั้นในช่วง 15 นาทีล่าสุด · เลเวลห่างไม่เกิน ±5 · ทีมอีกฝ่ายสู้ด้วย AI (เลือดเริ่มอย่างน้อย 30%)<br>
     • ชนะ = ได้ของที่อีกฝ่ายตก 100% (กติกาเดียวกับโทษการตาย) + 1 คิลในลีดเดอร์บอร์ดการสังหาร · แพ้ = โดนโทษการตายเหมือนปกติ<br>
@@ -5478,7 +5478,7 @@ function openVeteranShop(){
   document.getElementById('partPickContent').innerHTML = `<div class="panel">
     <h2>🎖️ ทหารผ่านศึกลึกลับ</h2>
     <div class="note">"ข้ามีของดีที่หาที่ไหนไม่ได้... แต่ข้ารับแต่กล่องเก็บเงินที่พกติดตัวเท่านั้น" · กล่องเก็บเงินในกระเป๋า: <b>${box}</b> กล่อง</div>
-    ${row('🧬 กล่องสุ่ม DNA (เพชร)', 'ราคา 1 กล่องเก็บเงิน (ต้องอยู่ในกระเป๋า)', `<button class="primary" onclick="vetBuyDnaBox()" ${box<1?'disabled':''}>แลก</button>`)}
+    ${row('🧬 กล่องสุ่ม DNA (เพชร)', `ราคา ${VET_DNA_COST_BOX} กล่องเก็บเงิน (ต้องอยู่ในกระเป๋า) · จำกัดสัปดาห์ละ 1 ครั้ง (รีเซ็ตวันจันทร์)${profile.vetDnaWeek===thWeekKey()?' (สัปดาห์นี้แลกแล้ว)':''}`, `<button class="primary" onclick="vetBuyDnaBox()" ${(box<VET_DNA_COST_BOX||profile.vetDnaWeek===thWeekKey())?'disabled':''}>แลก</button>`)}
     ${Object.keys(RADAR_PRICES).map(st=>row(`📡 เรดาห์ตรวจจับ${STAGES[st].name}`, `${RADAR_PRICES[st].toLocaleString()}🪙 · ใช้ได้ ${RADAR_USES} ครั้ง · ค้นหาและดักผู้เล่นในด่านนี้`, `<button class="primary" onclick="vetBuyRadar('${st}')" ${profile.coins<RADAR_PRICES[st]?'disabled':''}>ซื้อ</button>`)).join('')}
     ${row('📦 ฝากเงินเข้ากล่องเก็บเงิน', `จ่าย ${VET_MONEYBOX_SERVICE.toLocaleString()}🪙 ได้กล่องเก็บเงิน 1 กล่อง (เปิดได้ ${MONEY_BOX_COINS.toLocaleString()}🪙)`, `<button class="primary" onclick="vetMoneyBoxService()" ${profile.coins<VET_MONEYBOX_SERVICE?'disabled':''}>ฝาก</button>`)}
     ${row('💰 ขายทองแท่ง', `รับซื้อแท่งละ 💎 ${cfgSet('vet_gold_sell').toLocaleString()} (ทองแท่งต้องอยู่ในกระเป๋า · มี ${bagQty('gold_bar')} แท่ง)`, `<button class="diamond" onclick="vetSellGold()" ${bagQty('gold_bar')<1?'disabled':''}>ขาย</button>`)}
@@ -5487,11 +5487,16 @@ function openVeteranShop(){
   </div>`;
   document.getElementById('partPickOverlay').classList.add('show');
 }
+const VET_DNA_COST_BOX = 5;   // กล่องสุ่ม DNA เพชร = กล่องเก็บเงิน 5 กล่อง (สัปดาห์ละ 1)
+function thWeekKey(){ return Math.floor((Math.floor((Date.now()+7*3600000)/86400000)+3)/7); }   // สัปดาห์เริ่มวันจันทร์ (เวลาไทย)
 async function vetBuyDnaBox(){
   if(!veteranActive()) return;
-  if(!(await takeFromBag('money_box',1))){ showToast('ต้องมีกล่องเก็บเงินในกระเป๋า'); return; }
+  if(profile.vetDnaWeek === thWeekKey()){ showToast('สัปดาห์นี้แลกกล่องสุ่ม DNA ไปแล้ว (จำกัดสัปดาห์ละ 1 ครั้ง)'); return; }
+  if(dnaPackages.length >= DNA_CAP){ showToast(`คลัง DNA เต็ม (สูงสุด ${DNA_CAP} ชิ้น)`); return; }
+  if(!(await takeFromBag('money_box',VET_DNA_COST_BOX))){ showToast(`ต้องมีกล่องเก็บเงิน ${VET_DNA_COST_BOX} กล่องในกระเป๋า`); return; }
   const pkg = rollDNAPackage('diaW'); dnaPackages.push(pkg);
-  await saveDNAPackages(); renderAll(); openVeteranShop();
+  profile.vetDnaWeek = thWeekKey();
+  await saveProfile(); await saveDNAPackages(); renderAll(); openVeteranShop();
   showToast(`🧬 ได้แพ็ค DNA เกรด ${pkg.grade}!`);
 }
 async function vetBuyRadar(st){
