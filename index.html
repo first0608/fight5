@@ -4954,7 +4954,7 @@ const LB_STAGE_POINTS = { hospital:1, school:2, campground:3, ruins:5, pipe:10 }
 const LB_LABEL = { h:'รายชั่วโมง', d:'รายวัน', w:'รายสัปดาห์', m:'รายเดือน' };
 const LB_REWARD_TABLE = {
   h: [['1',50,1],['2',25,1],['3–4',10,1],['5–10',5,1]],
-  d: [['1',100,10],['2',50,5],['3–4',50,3],['5–10',10,2]],
+  d: [['1',100,10],['2',50,5],['3–4',25,3],['5–10',10,2]],
   w: [['1',1000,20],['2',500,10],['3–4',250,5],['5–10',100,3]],
   m: [['1',2500,30],['2',1500,20],['3–4',1000,10],['5–10',500,5]],
 };
@@ -5102,10 +5102,20 @@ function mktReceiveItem(item){
     dnaPackages.push({ ...item.pkg, id:newId() });
   }
 }
+const MKT_UNLOCK_LEVEL = 10;
+function mktMaxLevel(){ return roster.reduce((m,c)=>Math.max(m, c.level||0), 0); }
 function mktAllowed(){
   if(ON.mktUnlocked) return true;
+  if(mktMaxLevel() >= MKT_UNLOCK_LEVEL) return true;
   return ON.createdAt && (Date.now() - ON.createdAt >= MKT_NEW_DAYS*86400000);
 }
+function mktCountdownText(){
+  const left = (ON.createdAt||Date.now()) + MKT_NEW_DAYS*86400000 - Date.now();
+  if(left <= 0) return 'ครบแล้ว';
+  const s = Math.floor(left/1000), d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60), sec = s%60;
+  return `${d} วัน ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+setInterval(()=>{ const el = document.getElementById('mktCountdown'); if(el) el.textContent = mktCountdownText(); }, 1000);
 async function mktLoad(){
   if(!isOnlineMode() || !ON.token){ mkt.err = 'ตลาดผู้เล่นใช้ได้เฉพาะโหมดออนไลน์'; renderP2PMarket(); return; }
   mkt.loading = true; mkt.err=''; renderP2PMarket();
@@ -5123,8 +5133,12 @@ function renderP2PMarket(){
   const allowed = mktAllowed() || mkt.serverAllowed;
   let gate = '';
   if(!allowed){
-    const daysLeft = ON.createdAt ? Math.ceil((ON.createdAt + MKT_NEW_DAYS*86400000 - Date.now())/86400000) : MKT_NEW_DAYS;
-    gate = `<div class="part-pick-item" style="border-color:var(--accent)"><div>🔒 ไอดีใหม่ (อีก ${daysLeft} วันถึงจะครบ ${MKT_NEW_DAYS} วัน) ต้องปลดล็อกก่อนซื้อขาย<div class="note" style="margin:2px 0 0;">จ่ายครั้งเดียว ใช้ได้ตลอด</div></div>
+    const lv = mktMaxLevel();
+    gate = `<div class="part-pick-item" style="border-color:var(--accent);flex-wrap:wrap;">
+      <div style="flex:1 1 100%;">🔒 ตลาดยังไม่เปิดสำหรับไอดีนี้ — ปลดล็อกได้ 3 ทาง (ทางไหนก็ได้):
+        <div class="note" style="margin:4px 0 0;">⭐ มีตัวละครเลเวล ${MKT_UNLOCK_LEVEL} ขึ้นไป 1 ตัว (ตอนนี้สูงสุด Lv.${lv})</div>
+        <div class="note" style="margin:2px 0 0;">⏳ รอให้ไอดีครบ ${MKT_NEW_DAYS} วัน — เหลืออีก <b id="mktCountdown" style="color:var(--accent);font-variant-numeric:tabular-nums;">${mktCountdownText()}</b></div>
+        <div class="note" style="margin:2px 0 0;">💎 จ่าย ${MKT_UNLOCK_COST} เพชร ปลดล็อกทันที (ครั้งเดียว ใช้ได้ตลอด)</div></div>
       <button class="diamond" onclick="mktUnlock()" ${profile.diamonds<MKT_UNLOCK_COST?'disabled':''}>ปลดล็อก · ${MKT_UNLOCK_COST}💎</button></div>`;
   }
   const counts = { all:0 };
