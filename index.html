@@ -417,7 +417,9 @@
       <div class="panel" id="stageSelect">
         <h2>🗺️ เลือกด่าน</h2>
         <div id="stageGrid" class="cgrid" style="grid-template-columns:repeat(2,1fr);gap:10px;"></div>
+        <div class="vetBtnBox"></div>
       </div>
+      <div class="panel" id="pvpPanel" style="display:none;"></div>
 
       <div class="panel" id="battleStage" style="display:none;">
         <div id="sceneImg"></div>
@@ -440,6 +442,7 @@
     <!-- 🏪 MARKET -->
     <div class="screen" data-screen="market">
       <div class="panel" id="topupPanel" style="display:none;"></div>
+      <div class="vetBtnBox"></div>
       <div class="panel">
         <h2>🛒 ร้านขายของ</h2>
         <div class="row" id="shopRow">
@@ -473,6 +476,12 @@
             <div class="note" style="text-align:center;">100💎/ชิ้น (ไม่จำกัด)</div>
             <button class="primary" style="width:100%;margin-top:6px;" onclick="buyShopItem('dropmult_potion')">ซื้อ</button>
           </div>
+          <div>
+            <div style="text-align:center;">🥇</div>
+            <div class="note" style="text-align:center;">ทองแท่ง (ใช้แลกอาวุธ/ชุดเกราะพิเศษ)</div>
+            <div class="note" style="text-align:center;" id="goldShopNote">1500💎 · เดือนละ 1 ครั้ง</div>
+            <button class="diamond" style="width:100%;margin-top:6px;" onclick="buyGoldBarShop()" id="goldShopBtn">ซื้อ</button>
+          </div>
         </div>
       </div>
       <div class="panel">
@@ -497,17 +506,21 @@
     <div class="screen" data-screen="rank">
       <div id="rankRoot"></div>
     </div>
+    <div class="screen" data-screen="quest">
+      <div id="questRoot"></div>
+    </div>
 
   </div>
 
   <div id="tabnav">
     <button data-tab="gacha" class="active"><span class="ic">🥚</span>สุ่มการ์ด</button>
-    <button data-tab="team"><span class="ic">🛡️</span>ทีมของฉัน</button>
+    <button data-tab="team"><span class="ic">🛡️</span>ทีม</button>
     <button data-tab="dna"><span class="ic">🧬</span>DNA</button>
     <button data-tab="bag"><span class="ic">🎒</span>กระเป๋า</button>
     <button data-tab="battle"><span class="ic">⚔️</span>ต่อสู้</button>
     <button data-tab="market"><span class="ic">🏪</span>ตลาด</button>
     <button data-tab="guild"><span class="ic">🏰</span>กิล</button>
+    <button data-tab="quest"><span class="ic">🎯</span>เควส</button>
     <button data-tab="rank"><span class="ic">🏆</span>อันดับ</button>
   </div>
 
@@ -727,7 +740,7 @@ async function onlineLogin(){
   onlineApplySession(r);
   await loadState();
   renderAccountPanel();
-  checkGifts(); onlineTick();
+  checkGifts(); onlineTick(); loadGameCfg();
   renderTopupPanel(); loadTopupInfo(true);
   if(code){
     document.getElementById('codeInput').value = code;
@@ -769,7 +782,7 @@ async function bootGame(){
     setGateMsg('กำลังเชื่อมต่อเซิร์ฟเวอร์…');
     try{
       const r = await onlineRpc({a:'resume', t:tok});
-      if(r && r.ok){ onlineApplySession(r); await loadState(); renderAccountPanel(); checkGifts(); onlineTick(); renderTopupPanel(); loadTopupInfo(true); return; }
+      if(r && r.ok){ onlineApplySession(r); await loadState(); renderAccountPanel(); checkGifts(); onlineTick(); loadGameCfg(); renderTopupPanel(); loadTopupInfo(true); return; }
       lsDel('fight5_token');
     } catch(e){
       setGateMsg('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองเข้าใหม่อีกครั้ง', true);
@@ -1175,6 +1188,27 @@ function renderGuide(){
     • แพ้ในสงครามกิล ไม่มีโทษการตาย<br>
     • ถ้าตายในโซนที่มีกิลครอง ของที่หายแต่ละชิ้นมีโอกาส ${DEATH_LOOT_TO_OWNER_CHANCE}% ไปอยู่ในคลังกิลผู้ครองพื้นที่นั้น`));
 
+  secs.push(gSec('📡 ดักผู้เล่น · ทหารผ่านศึก · ทองแท่ง', `
+    <b>🎖️ ทหารผ่านศึกลึกลับ:</b> สุ่มโผล่หลังชนะด่าน (โรงเรียน 1% · ค่ายทหาร 2% · ซากเมือง 3%) อยู่ 30 นาที — ปุ่มขึ้นในแท็บต่อสู้/ตลาด
+    ${gTable(['สินค้า','ราคา'],[['🧬 กล่องสุ่ม DNA เพชร','📦 กล่องเก็บเงิน 1 กล่อง (ต้องอยู่ในกระเป๋า)'],['📡 เรดาห์ โรงเรียน / ค่ายทหาร / ซากเมือง','2,500 / 5,000 / 7,500🪙 (ใช้ได้ 3 ครั้ง)'],['📦 บริการฝากเงินเข้ากล่อง','10,000🪙 → กล่องเก็บเงิน 1 กล่อง (เปิดได้ 5,000)'],['🥇 ทองแท่ง','📦 กล่องเก็บเงิน 5 กล่อง · วันละ 1 ครั้ง']])}
+    <b>🥇 ทองแท่ง</b> ซื้อในร้านได้ ${GOLD_SHOP_PRICE}💎 (เดือนละ 1 ครั้ง) · ใช้แลกอาวุธ/ชุดเกราะพิเศษที่จะมาในอนาคต<br>
+    <b>📡 ดักผู้เล่น:</b> ใช้เรดาห์ของด่านนั้นสแกนหาผู้เล่นที่ลงฟาร์มด่านนั้นในช่วง 15 นาทีล่าสุด · เลเวลห่างไม่เกิน ±5 · ทีมอีกฝ่ายสู้ด้วย AI (เลือดเริ่มอย่างน้อย 30%)<br>
+    • ชนะ = ได้ของที่อีกฝ่ายตก 100% (กติกาเดียวกับโทษการตาย) + 1 คิลในลีดเดอร์บอร์ดการสังหาร · แพ้ = โดนโทษการตายเหมือนปกติ<br>
+    • คนที่โดนดักได้โล่ 60 นาที · ถ้าป้องกันสำเร็จจะได้แจ้งเตือน<br>
+    • 🟥 ตัวแดง: ดักเกิน ${PVP_RED_AFTER} ครั้ง/วัน → ถ้าแพ้ยกทีม โอกาสของตก x2 (รีเซ็ต 00:00 น.)<br>
+    • 👑 VIP ล็อกของที่สวมใส่ได้ 1 ชิ้น (DNA / ชิ้นส่วน / อุปกรณ์) ชิ้นนั้นจะไม่ตกทั้งตอนแพ้และตอนโดนดัก
+    <b>⚔️ รางวัลการสังหาร:</b>
+    ${gTable(['อันดับ','รายวัน','รายเดือน'], KILL_REWARD_TABLE.kd.map((r,i)=>{ const m=KILL_REWARD_TABLE.km[i]; return [r[0], `💎${r[1]} · 🪙${r[2].toLocaleString()}`, `💎${m[1]} · 🪙${m[2].toLocaleString()}${m[3]?` · 🧬x${m[3]}`:''}`]; }))}
+    ระหว่างต่อสู้ใช้เมนู/ฟังก์ชันอื่นไม่ได้ (ต้องปิดไฟต์ก่อน) · ตลาดผู้เล่นตั้งราคาขั้นต่ำ ${MKT_MIN_PRICE} เพชร`));
+  secs.push(gSec('🎯 เควส · แต้มกิจกรรม · เควสเซิร์ฟเวอร์', `
+    <b>เควสรายวัน/รายเดือน</b> ดูได้ในแท็บ 🎯 เควส ทำครบแล้วกดรับรางวัล + แต้มกิจกรรม (รายวันรีเซ็ต 00:00 น. · รายเดือนรีเซ็ตวันที่ 1)<br>
+    • "ชนะต่อเนื่องโดยไม่ตาย" = ชนะด่านติดกันโดยไม่มีนักสู้ตัวไหนเลือดหมด แพ้หรือมีตัวตายเริ่มนับใหม่<br>
+    • สุ่มกาชา นับตามจำนวนครั้งที่สุ่ม (สุ่ม 10 = 10 ครั้ง)<br>
+    <b>🧱 ปูน / 🔩 เหล็กเส้น</b> ดรอปจากทุกด่าน (ด่านยากดรอปบ่อยกว่า) · ส่งให้ทหารผ่านศึกลึกลับตอนที่เขาโผล่<br>
+    <b>🏗️ เควสเซิร์ฟเวอร์:</b> ทั้งเซิร์ฟช่วยกันส่งปูน ${cfgSet('sq_cement').toLocaleString()} + เหล็กเส้น ${cfgSet('sq_rebar').toLocaleString()} ภายในเดือน → ทุกคนได้ 💎 ${cfgSet('sq_dia')} + 🎫 ${cfgSet('sq_points')} แต้ม + ดรอปเพิ่ม ${cfgSet('sq_drop_pct')}% นาน ${cfgSet('sq_drop_days')} วัน<br>
+    <b>🥇 ทองแท่ง</b> ดรอปได้จากด่านซากเมือง (${cfgSet('gold_drop_ruins')}%) และท่อน้ำ (${cfgSet('gold_drop_pipe')}%) · ขายให้ทหารผ่านศึกได้แท่งละ 💎 ${cfgSet('vet_gold_sell').toLocaleString()}<br>
+    <b>🎟️ แลกแต้มกิจกรรม:</b> ${GCFG.ex.filter(x=>x.on).map(x=>`${esc(x.name)} = ${x.pts} แต้ม`).join(' · ')}`));
+
   secs.push(gSec('🏪 ตลาด · รายวัน · พลังฟาร์ม', `
     ${gTable(['สินค้า','ราคา'],[['🧪 น้ำยาเพิ่มเลือด', SHOP_PRICES.heal_potion+'🪙'],['🎒 เสบียง', `${SHOP_PRICES.oil}🪙 (${SUPPLIES_LIMIT_PER_WINDOW} ชิ้น/2 ชม.)`],['📖 ยาคูณ EXP', `${SHOP_PRICES_DIAMOND.exp_potion}💎 (ได้ ${SHOP_ITEM_QTY.exp_potion||1} หน่วย)`],['✨ น้ำยาคูณดรอป', SHOP_PRICES_DIAMOND.dropmult_potion+'💎'],['🎫 บัตรลงด่านท่อน้ำ', PIPE_MAP_COST+'🪙 / ใบ (ลงได้ 1 ครั้ง)']])}
     <b>พลังฟาร์ม (⚡):</b> สูงสุด 30 ฟื้น +1 ทุก 2 นาที<br>
@@ -1472,6 +1506,13 @@ const ITEM_DEFS = {
   exp_potion:       { name:'ยาคูณ EXP',        icon:'📖' },
   dropmult_potion:  { name:'น้ำยาคูณดรอป',     icon:'✨' },
   money_box:        { name:'กล่องเก็บเงิน',     icon:'📦' },
+  gold_bar:         { name:'ทองแท่ง',           icon:'🥇' },
+  radar_school:     { name:'เรดาห์ตรวจจับด่านโรงเรียน', icon:'📡' },
+  radar_campground: { name:'เรดาห์ตรวจจับด่านค่ายทหาร', icon:'📡' },
+  radar_ruins:      { name:'เรดาห์ตรวจจับด่านซากเมือง', icon:'📡' },
+  cement:           { name:'ปูน',               icon:'🧱' },
+  rebar:            { name:'เหล็กเส้น',          icon:'🔩' },
+  blueprint_ticket: { name:'ใบสุ่มแปลนคราฟอุปกรณ์', icon:'📜' },
   ore_iron:         { name:'เศษแร่เหล็ก',       icon:null, mat:'ore_iron' },
   log_hardwood:     { name:'ไม้เนื้อแข็ง',      icon:null, mat:'log_hardwood' },
   log_teak:         { name:'ไม้สัก',            icon:null, mat:'log_teak' },
@@ -1530,6 +1571,7 @@ async function moveItemToWarehouse(itemId){
   renderBag();
 }
 async function moveItemToBag(itemId){
+  if(battleActive){ showToast('ระหว่างต่อสู้เอาของออกจากตู้เซฟไม่ได้'); return; }
   if(!(warehouseItems[itemId] > 0)) return;
   const isNewInBag = !(bagItems[itemId] > 0);
   const bagTypeCount = Object.keys(bagItems).filter(k=>bagItems[k]>0).length;
@@ -1878,6 +1920,7 @@ async function doDNARoll(kind, times){
   const bal = kind==='coin' ? profile.coins : profile.diamonds;
   if(bal < cost){ showToast(kind==='coin' ? 'เหรียญไม่พอ' : 'เพชรไม่พอ'); return; }
   if(kind==='coin') profile.coins -= cost; else profile.diamonds -= cost;
+  questAdd('gacha', times);
 
   const rolled = [];
   for(let i=0;i<times;i++){
@@ -1898,6 +1941,7 @@ async function doPartRoll(kind, times){
   const bal = kind==='coin' ? profile.coins : profile.diamonds;
   if(bal < cost){ showToast(kind==='coin' ? 'เหรียญไม่พอ' : 'เพชรไม่พอ'); return; }
   if(kind==='coin') profile.coins -= cost; else profile.diamonds -= cost;
+  questAdd('gacha', times);
   const weightKey = kind==='coin' ? 'partW' : 'diaW';
   const rolled = [];
   for(let i=0;i<times;i++){
@@ -2109,7 +2153,7 @@ function renderRoster(){
     el.addEventListener('click', ()=> openDetail(el.dataset.id));
   });
 }
-function renderAll(){ renderHud(); renderRoster(); renderBag(); renderDNATab(); renderShop(); renderGuildTab(); renderVault(); renderVipPanel(); if(document.getElementById('p2pMarket') && mkt.list) renderP2PMarket(); }
+function renderAll(){ renderHud(); renderRoster(); renderBag(); renderDNATab(); renderShop(); renderGuildTab(); renderVault(); renderVipPanel(); renderPvpPanel(); if(document.querySelector('.screen.active[data-screen="quest"]')) renderQuestTab(); renderGoldShopNote(); renderVeteranButtons(); if(document.getElementById('p2pMarket') && mkt.list) renderP2PMarket(); }
 
 function dnaPkgCardHtml(pkg){
   return `<div class="part-pick-item">
@@ -3026,6 +3070,9 @@ function startBattle(diff){
   battleActive = true;                 // ล็อกทันทีกันสแปมกดซ้ำ ก่อนจะไปทำงานอย่างอื่นต่อ
   profile.stamina -= STAGES[diff].staminaCost;
   if(STAGES[diff].isBoss) profile.pipeTickets--;   // ใช้บัตร 1 ใบต่อการลง 1 ครั้ง (แพ้/ชนะก็ใช้บัตร)
+  if(PVP_STAGES.includes(diff)) profile.lastFarm = { stage:diff, ts:Date.now() };
+  questAdd('stamina', STAGES[diff].staminaCost);
+  if(diff==='pipe') questAdd('pipe', 1);
   saveProfile(); renderHud();
   currentDiff = diff;
   warBattle = null;
@@ -3249,6 +3296,7 @@ function battleOutcome(){
 function checkBattleOutcome(){
   const result = battleOutcome();
   if(!result) return;
+  if(pvpBattle){ endPvpBattle(result); return; }   // ดักผู้เล่น
   if(warBattle){ endWarBattle(result); return; }   // สงครามกิล: จบแล้วนับดาเมจ ไม่มีเฟส/ของดรอปปกติ
   if(result==='win'){
     const stage = STAGES[currentDiff];
@@ -3292,7 +3340,9 @@ async function applyDeathPenalty(){
     }
   }
   // 1) 25%: เสียของ 1–3 ชิ้น สุ่มจากไอเทมในกระเป๋า / ชิ้นส่วนที่ไม่ได้ใส่ / แพ็ค DNA (ตู้เซฟปลอดภัย)
-  if(Math.random()*100 < ((DEV.on && DEV.forceWornLoss) ? 100 : DEATH_ITEM_LOSS_CHANCE)){
+  const lossMult = deathLossMult();   // ตัวแดง: โอกาสของตก x2
+  if(lossMult>1) logLine('sys', '🟥 ตัวแดง: โอกาสของตก x2');
+  if(Math.random()*100 < ((DEV.on && DEV.forceWornLoss) ? 100 : Math.min(100, DEATH_ITEM_LOSS_CHANCE*lossMult))){
     const n = DEATH_ITEM_LOSS_MIN + Math.floor(Math.random()*(DEATH_ITEM_LOSS_MAX-DEATH_ITEM_LOSS_MIN+1));
     let lost = 0;
     for(let k=0;k<n;k++){
@@ -3323,7 +3373,7 @@ async function applyDeathPenalty(){
     if(lost){ await saveBagItems(); await saveParts(); await saveDNAPackages(); }
   }
 
-  if(Math.random()*100 < ((DEV.on && DEV.forceWornLoss) ? 100 : DEATH_EQUIPPED_LOSS_CHANCE)){
+  if(Math.random()*100 < ((DEV.on && DEV.forceWornLoss) ? 100 : Math.min(100, DEATH_EQUIPPED_LOSS_CHANCE*lossMult))){
     const fighters = battleUnits.filter(u=>u.side==='me' && !u.isMinion).map(u=>u.char);
     const worn = [];
     fighters.forEach(ch=>{
@@ -3331,6 +3381,8 @@ async function applyDeathPenalty(){
       parts.filter(p=>p.equippedTo===ch.id).forEach(p=> worn.push({type:'part', ch, p}));
       equipment.filter(g=>g.equippedTo===ch.id).forEach(g=> worn.push({type:'gear', ch, g}));
     });
+    const lockedOut = worn.filter(w=>isWornLocked(w)).length;
+    if(lockedOut){ worn.splice(0, worn.length, ...worn.filter(w=>!isWornLocked(w))); }
     if(worn.length){
       const w = worn[Math.floor(Math.random()*worn.length)];
       let obj, label;
@@ -3442,7 +3494,10 @@ async function endBattle(result){
     const gDropPct = myGuildBonus().drop || 0;   // อัปเกรดกิล: โอกาสได้ของเพิ่ม 1 กลุ่ม
     const gDropProc = gDropPct>0 && Math.random()*100 < gDropPct;
     if(gDropProc) logLine('sys', `🏰 โบนัสกิล: ได้ของเพิ่ม 1 กลุ่ม!`);
-    const groupCount = Math.min(4, (dropBoosted ? 3 : 2) + (gDropProc ? 1 : 0));
+    const sqPct = sqBonusPct();   // เควสเซิร์ฟเวอร์สำเร็จ: อัตราดรอปเพิ่ม
+    const sqProc = sqPct>0 && Math.random()*100 < sqPct;
+    if(sqProc) logLine('sys', `🏗️ โบนัสเควสเซิร์ฟเวอร์: ได้ของเพิ่ม 1 กลุ่ม!`);
+    const groupCount = Math.min(4, (dropBoosted ? 3 : 2) + (gDropProc ? 1 : 0) + (sqProc ? 1 : 0));
     let remainingPool = groupWeights.slice();
     const chosenGroups = [];
     for(let i=0;i<groupCount;i++){
@@ -3494,6 +3549,7 @@ async function endBattle(result){
     let equipDropChance = 1;
     if(currentDiff==='pipe') equipDropChance = 40;
     else if(currentDiff==='ruins') equipDropChance = 5;
+    equipDropChance *= 1 + sqBonusPct()/100;
     if(Math.random()*100 < equipDropChance){
       const slot = EQUIP_SLOTS[Math.floor(Math.random()*EQUIP_SLOTS.length)];
       const gear = makeEquipmentItem(slot);
@@ -3509,14 +3565,18 @@ async function endBattle(result){
     // ภาษีโซน: คิดจากเหรียญ/เพชรทั้งหมดที่ได้ในไฟต์นี้
     await applyZoneTax(taxOwner, profile.coins - coinsBeforeReward, profile.diamonds - diaBeforeReward, taxedGear, dropLines);
 
+    questExtraDrops(currentDiff, dropLines);
     dropLines.forEach(l => logLine('sys', l));
     lbRecordWin(currentDiff);
+    questBattleResult(true, battleUnits.filter(u=>u.side==='me' && !u.isMinion).every(u=>u.curHp>0));
+    if(maybeSpawnVeteran(currentDiff)) questAdd('vet', 1);
     await saveProfile();
     await saveBagItems();
     await saveWarehouseItems();
     renderAll();
   } else if(result==='lose'){
     logLine('sys', `💀 แพ้ยกทีม — ไม่ได้อะไรเลย`);
+    questBattleResult(false);
     await applyDeathPenalty();
   } else {
     logLine('sys', `⚖️ เสมอ`);
@@ -3711,7 +3771,7 @@ function toggleAutoBattle(){
 
 function closeBattle(){
   if(warBattle && !warBattle.recorded) endWarBattle('quit');   // ออกกลางไฟต์สงคราม: นับดาเมจที่ทำไปแล้ว
-  warBattle = null;
+  warBattle = null; pvpBattle = null;
   battleActive=false; battleOver=false;
   if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
   autoOn=false;
@@ -3722,6 +3782,7 @@ function closeBattle(){
   document.getElementById('battleWheelBox').style.display='block';
   document.getElementById('stageSelect').style.display='block';
   document.getElementById('battleStage').style.display='none';
+  renderPvpPanel();
   pickedIds = [];
   renderPickGrid();
   renderStageGrid();
@@ -4523,6 +4584,7 @@ async function startWarBattle(zone){
 
   battleActive = true;
   profile.warAttemptsUsed = (profile.warAttemptsUsed||0) + 1;
+  questAdd('war', 1);
   await saveProfile();
   warBattle = { zone, windowId:warWindowId(), gid:guildState.guild.id, gname:guildState.guild.name, round:0, recorded:false };
   currentDiff = zone;
@@ -4913,7 +4975,12 @@ function renderVipPanel(){
   el.innerHTML = `<h2>👑 แพ็ค VIP</h2>
     <div class="note">ปลดล็อกปุ่ม <b>⚡ จบทันที</b> ในหน้าต่อสู้ — กดปุ๊บคำนวณการต่อสู้จนจบทันที ไม่ต้องรอดูทีละเทิร์น</div>
     <div class="part-pick-item"><div>${on ? `✅ VIP ใช้งานอยู่ ถึง <b>${fmtThDate(profile.vipUntil)}</b>` : 'ยังไม่ได้เป็น VIP'}<div class="note" style="margin:2px 0 0;">${VIP_PRICE}💎 / ${VIP_DAYS} วัน · ซื้อซ้ำ = ต่ออายุเพิ่ม ${VIP_DAYS} วัน</div></div>
-      <button class="diamond" onclick="buyVip()" ${profile.diamonds<VIP_PRICE?'disabled':''}>${on?'ต่ออายุ':'ซื้อ'} · ${VIP_PRICE}💎</button></div>`;
+      <button class="diamond" onclick="buyVip()" ${profile.diamonds<VIP_PRICE?'disabled':''}>${on?'ต่ออายุ':'ซื้อ'} · ${VIP_PRICE}💎</button></div>
+    <div class="note" style="margin-top:8px;">🔒 <b>ล็อกของที่สวมใส่ 1 ชิ้น</b> (DNA ที่ติดตั้ง / ชิ้นส่วนอวัยวะ / อุปกรณ์) — ชิ้นที่ล็อกจะไม่ตกเมื่อแพ้ยกทีมหรือโดนดัก${on?'':' (เฉพาะ VIP)'}</div>
+    ${on ? (()=>{ const opts = vipLockOptions(); const cur = profile.vipLock||'';
+      const valid = opts.some(o=>o.key===cur);
+      return `<select style="width:100%;margin-top:4px;" onchange="setVipLock(this.value)"><option value="">— ไม่ล็อก —</option>${opts.map(o=>`<option value="${o.key}" ${o.key===cur?'selected':''}>${esc(o.label)}</option>`).join('')}</select>
+        ${cur && !valid ? '<div class="note">⚠️ ของที่เคยล็อกไม่ได้สวมอยู่แล้ว เลือกใหม่ได้</div>' : ''}`; })() : ''}`;
   const b = document.getElementById('btnInstant');
   if(b) b.textContent = on ? '⚡ จบทันที' : '🔒 จบทันที (VIP)';
 }
@@ -4951,7 +5018,7 @@ async function openMoneyBox(){
 // 🏆 ลีดเดอร์บอร์ดการล่า (ชั่วโมง / วัน / สัปดาห์ / เดือน)
 // =====================================================================
 const LB_STAGE_POINTS = { hospital:1, school:2, campground:3, ruins:5, pipe:10 };
-const LB_LABEL = { h:'รายชั่วโมง', d:'รายวัน', w:'รายสัปดาห์', m:'รายเดือน' };
+const LB_LABEL = { h:'รายชั่วโมง', d:'รายวัน', w:'รายสัปดาห์', m:'รายเดือน', kd:'รายวัน', km:'รายเดือน' };
 const LB_REWARD_TABLE = {
   h: [['1',50,1],['2',25,1],['3–4',10,1],['5–10',5,1]],
   d: [['1',100,10],['2',50,5],['3–4',25,3],['5–10',10,2]],
@@ -4975,12 +5042,19 @@ async function onlineTick(){
   try{
     const sending = (profile.lbPending||[]).slice();
     let r;
-    try{ r = await onlineRpc({ a:'tick', t:ON.token, add:sending }); } catch(e){ return; }
+    try{ r = await onlineRpc({ a:'tick', t:ON.token, add:sending, here:pvpHereForTick() }); } catch(e){ return; }
     if(!r || !r.ok){ if(r && r.auth) onlineSessionExpired(); return; }
     profile.lbPending = (profile.lbPending||[]).slice(sending.length);
     const lines = [];
     (r.rewards||[]).forEach(w=>{
       profile.diamonds += w.dia;
+      if(KILL_REWARD_TABLE[w.ty]){
+        profile.coins += w.coin||0;
+        let boxTxt = '';
+        for(let i=0;i<(w.dnaBox||0);i++){ if(dnaPackages.length<DNA_CAP){ dnaPackages.push(rollDNAPackage('diaW')); boxTxt = ` · 🧬 กล่องสุ่ม DNA เพชร x${w.dnaBox}`; } }
+        lines.push(`⚔️ อันดับ ${w.rank} สังหาร${LB_LABEL[w.ty]} (${w.p} คิล) → 💎 ${w.dia} · 🪙 ${(w.coin||0).toLocaleString()}${boxTxt}`);
+        return;
+      }
       let oilTxt = `🎒 เสบียง x${w.oil}`;
       if(!addItem('oil', w.oil)){ profile.stamina += 5*w.oil; oilTxt = `⚡ พลังฟาร์ม +${5*w.oil} (กระเป๋า/ตู้เซฟเต็ม เลยแปลงเสบียงเป็นพลังฟาร์ม)`; }
       lines.push(`🏆 อันดับ ${w.rank} ${LB_LABEL[w.ty]} (${w.p} คะแนน) → 💎 ${w.dia} · ${oilTxt}`);
@@ -4994,6 +5068,26 @@ async function onlineTick(){
       mktReceiveItem(d.item);
       lines.push(d.why==='cancel' ? `↩️ ยกเลิกขาย ได้ ${label} คืน` : `🛒 ได้รับ ${label} (ซื้อจาก ${esc(d.from)})`);
     });
+    if(r.rewards && r.rewards.length) questAdd('lb', r.rewards.length);
+    if(r.sq){
+      profile.sq = { cement:r.sq.cement, rebar:r.sq.rebar, tc:r.sq.tc, tr:r.sq.tr, doneAt:r.sq.doneAt };
+      profile.sqBonusUntil = r.sq.bonusUntil||0; profile.sqBonusPct = r.sq.bonusPct||0;
+      if(r.sq.reward){
+        profile.diamonds += r.sq.reward.dia||0; profile.eventPts = (profile.eventPts||0) + (r.sq.reward.pts||0);
+        lines.push(`🏗️ เควสเซิร์ฟเวอร์สำเร็จ! → 💎 ${r.sq.reward.dia} · 🎫 แต้มกิจกรรม ${r.sq.reward.pts} · อัตราดรอป +${r.sq.bonusPct}% ถึง ${fmtThDate(profile.sqBonusUntil)}`);
+      }
+      if(document.querySelector('.screen.active[data-screen="quest"]')) renderQuestTab();
+    }
+    (r.pvp||[]).forEach(n=>{
+      const where = (STAGES[n.stage]||{}).name || n.stage;
+      if(n.lost){
+        const got = applyPvpLoss(n.loot||{});
+        lines.push(`⚔️ ถูกดักโดย ${esc(n.by)} ที่${where} — ทีมแพ้${got.length ? ' เสีย: '+got.join(', ') : ' (โชคดี ไม่มีของตก)'}`);
+      } else lines.push(`🛡️ ป้องกันการดักจาก ${esc(n.by)} ที่${where} สำเร็จ!`);
+    });
+    if((r.pvp||[]).some(n=>n.lost)) await saveRoster();
+    if(r.pvpCount!=null){ profile.pvpDay = thDayKey(); profile.pvpCount = Math.max(r.pvpCount, pvpTodayCount()); }
+    if(r.shieldUntil!=null) profile.pvpShieldUntil = r.shieldUntil;
     await saveProfile();
     if(lines.length){
       await saveBagItems(); await saveWarehouseItems(); await saveParts(); await saveEquipment(); await saveDNAPackages();
@@ -5027,7 +5121,9 @@ function lbSet(ty, prev){ lbView.ty = ty; lbView.prev = !!prev; lbView.data = nu
 function renderRank(){
   const el = document.getElementById('rankRoot'); if(!el) return;
   const d = lbView.data && lbView.data.ty===lbView.ty ? lbView.data : null;
-  const chips = ['h','d','w','m'].map(t=>`<button class="chip ${lbView.ty===t?'on':''}" onclick="lbSet('${t}', ${lbView.prev})">${LB_LABEL[t]}</button>`).join('');
+  const isKill = !!KILL_REWARD_TABLE[lbView.ty];
+  const chips = ['h','d','w','m'].map(t=>`<button class="chip ${lbView.ty===t?'on':''}" onclick="lbSet('${t}', ${lbView.prev})">${LB_LABEL[t]}</button>`).join('')
+    + `<div style="margin-top:4px;">⚔️ การสังหาร: ` + ['kd','km'].map(t=>`<button class="chip ${lbView.ty===t?'on':''}" onclick="lbSet('${t}', ${lbView.prev})">${LB_LABEL[t]}</button>`).join('') + `</div>`;
   const prevChips = `<button class="chip ${!lbView.prev?'on':''}" onclick="lbSet('${lbView.ty}', false)">รอบนี้</button><button class="chip ${lbView.prev?'on':''}" onclick="lbSet('${lbView.ty}', true)">รอบที่แล้ว</button>`;
   const pending = (profile && profile.lbPending||[]).reduce((s,x)=>s+x.p,0);
   let body = '';
@@ -5045,18 +5141,20 @@ function renderRank(){
     }).join('') : `<div class="empty-msg">ยังไม่มีใครทำคะแนนในรอบนี้ — ชนะด่านไหนก็ได้เพื่อขึ้นอันดับ!</div>`;
     body = head + me + `<div style="margin-top:8px;">${list}</div>`;
   }
-  const rw = LB_REWARD_TABLE[lbView.ty].map(r=>[`อันดับ ${r[0]}`, `💎 ${r[1].toLocaleString()} · 🎒 ${r[2]}`]);
+  const rw = isKill ? KILL_REWARD_TABLE[lbView.ty].map(r=>[`อันดับ ${r[0]}`, `💎 ${r[1].toLocaleString()} · 🪙 ${r[2].toLocaleString()}${r[3]?` · 🧬 กล่องDNAเพชร x${r[3]}`:''}`])
+    : LB_REWARD_TABLE[lbView.ty].map(r=>[`อันดับ ${r[0]}`, `💎 ${r[1].toLocaleString()} · 🎒 ${r[2]}`]);
   el.innerHTML = `<div class="panel">
-      <h2>🏆 ลีดเดอร์บอร์ดการล่า</h2>
+      <h2>${isKill?'⚔️ ลีดเดอร์บอร์ดการสังหาร':'🏆 ลีดเดอร์บอร์ดการล่า'}</h2>
       <div style="margin:6px 0;">${chips}</div>
       <div style="margin-bottom:6px;">${prevChips} <button class="chip" onclick="lbLoad()">🔄 รีเฟรช</button></div>
       ${pending?`<div class="note">⏳ คะแนนที่รอส่งขึ้นเซิร์ฟเวอร์ ${pending} คะแนน</div>`:''}
       ${body}
     </div>
     <div class="panel">
-      <h2>🎁 รางวัล${LB_LABEL[lbView.ty]}</h2>
+      <h2>🎁 รางวัล${isKill?'การสังหาร':''}${LB_LABEL[lbView.ty]}</h2>
       ${gTable(['อันดับ','รางวัล'], rw)}
-      <div class="note">คะแนน: ชนะด่านโรงพยาบาล 1 · โรงเรียน 2 · ค่ายทหาร 3 · ซากเมือง 5 · ท่อน้ำ 10 (สงครามกิลไม่นับ)<br>
+      ${isKill?`<div class="note">นับ 1 คิล ทุกครั้งที่ดักผู้เล่นอื่นแล้วชนะ (ใช้เรดาห์จากทหารผ่านศึกลึกลับ) · รางวัลส่งเข้าบัญชีอัตโนมัติหลังรอบจบ · เวลาไทย</div>`:''}
+      <div class="note" style="${isKill?'display:none':''}">คะแนน: ชนะด่านโรงพยาบาล 1 · โรงเรียน 2 · ค่ายทหาร 3 · ซากเมือง 5 · ท่อน้ำ 10 (สงครามกิลไม่นับ)<br>
       รางวัลส่งเข้าบัญชีอัตโนมัติหลังรอบจบ (ภายในไม่กี่นาทีที่เข้าเกม) · เวลาไทย · สัปดาห์เริ่มวันจันทร์<br>
       ⚠️ ถ้าไม่เข้าเกมนานเกิน 24 ชม. (รายชั่วโมง) / 14 วัน (รายวัน) / 10 สัปดาห์ / 4 เดือน รางวัลรอบนั้นจะหมดอายุ</div>
     </div>`;
@@ -5069,7 +5167,8 @@ setInterval(()=>{ if(document.querySelector('.screen.active[data-screen="rank"]'
 const MKT_TAX_PCT = 30;
 const MKT_UNLOCK_COST = 600;
 const MKT_NEW_DAYS = 7;
-const MKT_CAT_LABEL = { all:'ทั้งหมด', potion:'🧪 ยา/เสบียง', material:'🪵 วัตถุดิบ', part:'🦴 อวัยวะ', gear:'⚔️ อุปกรณ์', dna:'🧬 DNA', box:'📦 กล่องเก็บเงิน' };
+const MKT_MIN_PRICE = 30;   // ราคาขั้นต่ำต่อรายการ (เพชร)
+const MKT_CAT_LABEL = { all:'ทั้งหมด', potion:'🧪 ยา/เสบียง', material:'🪵 วัตถุดิบ', part:'🦴 อวัยวะ', gear:'⚔️ อุปกรณ์', dna:'🧬 DNA', box:'📦 กล่องเก็บเงิน/ทองแท่ง', radar:'📡 เรดาห์' };
 const MKT_POTION_IDS = ['heal_potion','oil','exp_potion','dropmult_potion'];
 let mkt = { list:null, cat:'all', loading:false, err:'', mineOnly:false };
 function mktCatOfItem(item){
@@ -5077,7 +5176,8 @@ function mktCatOfItem(item){
   if(item.kind==='part') return 'part';
   if(item.kind==='gear') return 'gear';
   if(item.kind==='dna') return 'dna';
-  if(item.itemId==='money_box') return 'box';
+  if(item.itemId==='money_box' || item.itemId==='gold_bar') return 'box';
+  if(String(item.itemId||'').startsWith('radar_')) return 'radar';
   if(MKT_POTION_IDS.includes(item.itemId)) return 'potion';
   return 'material';
 }
@@ -5236,7 +5336,7 @@ function mktOpenSell(cat){
     ${list.length ? list.map(x=>`<div class="part-pick-item" style="flex-wrap:wrap;gap:6px;">
         <div style="flex:1 1 100%;">${x.label}${x.max>1?` · มี ${x.max}`:''}</div>
         ${x.max>1?`<input type="number" id="mq_${x.key.replace(/[^a-zA-Z0-9]/g,'_')}" min="1" max="${x.max}" value="1" style="width:70px;" placeholder="จำนวน">`:''}
-        <input type="number" id="mp_${x.key.replace(/[^a-zA-Z0-9]/g,'_')}" min="1" placeholder="ราคา 💎" style="width:100px;" oninput="mktNetHint('${x.key.replace(/[^a-zA-Z0-9]/g,'_')}')">
+        <input type="number" id="mp_${x.key.replace(/[^a-zA-Z0-9]/g,'_')}" min="${MKT_MIN_PRICE}" placeholder="≥${MKT_MIN_PRICE} 💎" style="width:100px;" oninput="mktNetHint('${x.key.replace(/[^a-zA-Z0-9]/g,'_')}')">
         <span class="note" id="mn_${x.key.replace(/[^a-zA-Z0-9]/g,'_')}" style="margin:0;"></span>
         <button class="primary" onclick="mktSell('${x.key}')">ลงขาย</button>
       </div>`).join('') : `<div class="empty-msg">ไม่มีของที่ขายได้ในหมวดนี้</div>`}
@@ -5252,7 +5352,7 @@ async function mktSell(key){
   if(battleActive){ showToast('ทำรายการระหว่างต่อสู้ไม่ได้'); return; }
   const k = key.replace(/[^a-zA-Z0-9]/g,'_');
   const price = Math.floor(Number((document.getElementById('mp_'+k)||{}).value));
-  if(!(price>=1 && price<=1000000)){ showToast('ใส่ราคาเป็นเพชร 1–1,000,000'); return; }
+  if(!(price>=MKT_MIN_PRICE && price<=1000000)){ showToast(`ราคาขั้นต่ำ ${MKT_MIN_PRICE} เพชร (สูงสุด 1,000,000)`); return; }
   const [t, a, b] = key.split(':');
   let item, restore;
   if(t==='i'){
@@ -5288,9 +5388,546 @@ async function mktSell(key){
   mktLoad();
 }
 
+
+// =====================================================================
+// 🎖️ ทหารผ่านศึกลึกลับ — สุ่มโผล่หลังชนะด่าน (โรงเรียน 1% · ค่ายทหาร 2% · ซากเมือง 3%) อยู่ 30 นาที
+// =====================================================================
+const VETERAN_CHANCE = { school:1, campground:2, ruins:3 };
+const VETERAN_STAY_MS = 30*60000;
+const RADAR_PRICES = { school:2500, campground:5000, ruins:7500 };
+const RADAR_USES = 3;
+const VET_MONEYBOX_SERVICE = 10000;   // ฝากเงิน 10,000 เหรียญ → ได้กล่องเก็บเงิน 1 กล่อง (เปิดได้ 5,000)
+const VET_GOLD_COST_BOX = 5;          // ทองแท่ง = กล่องเก็บเงิน 5 กล่อง (จำกัดวันละ 1)
+const GOLD_SHOP_PRICE = 1500;         // ทองแท่งในร้าน = 1500 เพชร (จำกัดเดือนละ 1)
+function thMonthKey(){ return thDayKey().slice(0,7); }
+function veteranActive(){ return (profile && profile.veteranUntil||0) > Date.now(); }
+function maybeSpawnVeteran(stageKey){
+  const c = VETERAN_CHANCE[stageKey];
+  if(!c || veteranActive() || Math.random()*100 >= c) return false;
+  profile.veteranUntil = Date.now() + VETERAN_STAY_MS;
+  logLine('sys', `🎖️ ทหารผ่านศึกลึกลับปรากฏตัว! เปิดร้านได้ ${VETERAN_STAY_MS/60000} นาที (ปุ่มในแท็บต่อสู้/ตลาด)`);
+  showToast('🎖️ ทหารผ่านศึกลึกลับปรากฏตัว!');
+  return true;
+}
+function bagQty(id){ return bagItems[id]||0; }
+async function takeFromBag(id, n){
+  if(bagQty(id) < n) return false;
+  bagItems[id] -= n; if(bagItems[id]<=0) delete bagItems[id];
+  await saveBagItems(); return true;
+}
+function renderVeteranButtons(){
+  document.querySelectorAll('.vetBtnBox').forEach(el=>{
+    if(!profile || !veteranActive()){ el.innerHTML=''; el.style.display='none'; return; }
+    const left = profile.veteranUntil - Date.now();
+    el.style.display='block';
+    el.innerHTML = `<button class="primary" style="width:100%;" onclick="openVeteranShop()">🎖️ ทหารผ่านศึกลึกลับ (อยู่อีก ${Math.floor(left/60000)}:${String(Math.floor(left%60000/1000)).padStart(2,'0')})</button>`;
+  });
+}
+setInterval(renderVeteranButtons, 1000);
+function openVeteranShop(){
+  if(!veteranActive()){ showToast('ทหารผ่านศึกลึกลับจากไปแล้ว'); renderVeteranButtons(); return; }
+  const box = bagQty('money_box');
+  const goldToday = profile.vetGoldDay === thDayKey();
+  const row = (label, note, btn)=>`<div class="part-pick-item"><div>${label}<div class="note" style="margin:2px 0 0;">${note}</div></div>${btn}</div>`;
+  document.getElementById('partPickContent').innerHTML = `<div class="panel">
+    <h2>🎖️ ทหารผ่านศึกลึกลับ</h2>
+    <div class="note">"ข้ามีของดีที่หาที่ไหนไม่ได้... แต่ข้ารับแต่กล่องเก็บเงินที่พกติดตัวเท่านั้น" · กล่องเก็บเงินในกระเป๋า: <b>${box}</b> กล่อง</div>
+    ${row('🧬 กล่องสุ่ม DNA (เพชร)', 'ราคา 1 กล่องเก็บเงิน (ต้องอยู่ในกระเป๋า)', `<button class="primary" onclick="vetBuyDnaBox()" ${box<1?'disabled':''}>แลก</button>`)}
+    ${Object.keys(RADAR_PRICES).map(st=>row(`📡 เรดาห์ตรวจจับ${STAGES[st].name}`, `${RADAR_PRICES[st].toLocaleString()}🪙 · ใช้ได้ ${RADAR_USES} ครั้ง · ค้นหาและดักผู้เล่นในด่านนี้`, `<button class="primary" onclick="vetBuyRadar('${st}')" ${profile.coins<RADAR_PRICES[st]?'disabled':''}>ซื้อ</button>`)).join('')}
+    ${row('📦 ฝากเงินเข้ากล่องเก็บเงิน', `จ่าย ${VET_MONEYBOX_SERVICE.toLocaleString()}🪙 ได้กล่องเก็บเงิน 1 กล่อง (เปิดได้ ${MONEY_BOX_COINS.toLocaleString()}🪙)`, `<button class="primary" onclick="vetMoneyBoxService()" ${profile.coins<VET_MONEYBOX_SERVICE?'disabled':''}>ฝาก</button>`)}
+    ${row('💰 ขายทองแท่ง', `รับซื้อแท่งละ 💎 ${cfgSet('vet_gold_sell').toLocaleString()} (ทองแท่งต้องอยู่ในกระเป๋า · มี ${bagQty('gold_bar')} แท่ง)`, `<button class="diamond" onclick="vetSellGold()" ${bagQty('gold_bar')<1?'disabled':''}>ขาย</button>`)}
+    ${['cement','rebar'].map(it=>row(`${ITEM_DEFS[it].icon} ส่ง${ITEM_DEFS[it].name} (เควส)`, `มี ${totalItemQty(it)} หน่วย · นับเควสรายเดือน + เควสเซิร์ฟเวอร์`, `<span style="display:flex;gap:4px;"><input type="number" id="vetDon_${it}" min="1" max="${totalItemQty(it)}" value="${totalItemQty(it)}" style="width:64px;"><button class="primary" onclick="vetDonate('${it}')" ${totalItemQty(it)<1?'disabled':''}>ส่ง</button></span>`)).join('')}
+    ${row('🥇 ทองแท่ง', `ราคา ${VET_GOLD_COST_BOX} กล่องเก็บเงิน · จำกัดวันละ 1 ครั้ง${goldToday?' (วันนี้ซื้อแล้ว)':''} · ใช้แลกอาวุธ/เกราะระดับสูงในอนาคต`, `<button class="diamond" onclick="vetBuyGold()" ${(box<VET_GOLD_COST_BOX||goldToday)?'disabled':''}>แลก</button>`)}
+  </div>`;
+  document.getElementById('partPickOverlay').classList.add('show');
+}
+async function vetBuyDnaBox(){
+  if(!veteranActive()) return;
+  if(!(await takeFromBag('money_box',1))){ showToast('ต้องมีกล่องเก็บเงินในกระเป๋า'); return; }
+  const pkg = rollDNAPackage('diaW'); dnaPackages.push(pkg);
+  await saveDNAPackages(); renderAll(); openVeteranShop();
+  showToast(`🧬 ได้แพ็ค DNA เกรด ${pkg.grade}!`);
+}
+async function vetBuyRadar(st){
+  if(!veteranActive() || !RADAR_PRICES[st]) return;
+  if(profile.coins < RADAR_PRICES[st]){ showToast('เหรียญไม่พอ'); return; }
+  const loc = addItem('radar_'+st, RADAR_USES);
+  if(!loc){ showToast('กระเป๋า+ตู้เซฟเต็ม'); return; }
+  profile.coins -= RADAR_PRICES[st];
+  await saveProfile(); await saveBagItems(); await saveWarehouseItems(); renderAll(); openVeteranShop();
+  showToast(`📡 ได้เรดาห์${STAGES[st].name} (${RADAR_USES} ครั้ง)`);
+}
+async function vetMoneyBoxService(){
+  if(!veteranActive()) return;
+  if(profile.coins < VET_MONEYBOX_SERVICE){ showToast('เหรียญไม่พอ'); return; }
+  const loc = addItem('money_box',1); if(!loc){ showToast('กระเป๋า+ตู้เซฟเต็ม'); return; }
+  profile.coins -= VET_MONEYBOX_SERVICE;
+  await saveProfile(); await saveBagItems(); await saveWarehouseItems(); renderAll(); openVeteranShop();
+  showToast('📦 ได้กล่องเก็บเงิน 1 กล่อง');
+}
+async function vetBuyGold(){
+  if(!veteranActive()) return;
+  if(profile.vetGoldDay === thDayKey()){ showToast('วันนี้แลกทองแท่งไปแล้ว'); return; }
+  if(bagQty('money_box') < VET_GOLD_COST_BOX){ showToast(`ต้องมีกล่องเก็บเงิน ${VET_GOLD_COST_BOX} กล่องในกระเป๋า`); return; }
+  await takeFromBag('money_box', VET_GOLD_COST_BOX);
+  if(!addItem('gold_bar',1)) warehouseItems.gold_bar = (warehouseItems.gold_bar||0)+1;
+  profile.vetGoldDay = thDayKey();
+  await saveProfile(); await saveBagItems(); await saveWarehouseItems(); renderAll(); openVeteranShop();
+  showToast('🥇 ได้ทองแท่ง 1 แท่ง!');
+}
+async function buyGoldBarShop(){
+  if(battleActive){ showToast('ทำรายการระหว่างต่อสู้ไม่ได้'); return; }
+  if(profile.goldShopMonth === thMonthKey()){ showToast('เดือนนี้ซื้อทองแท่งไปแล้ว (จำกัดเดือนละ 1)'); return; }
+  if(profile.diamonds < GOLD_SHOP_PRICE){ showToast('เพชรไม่พอ'); return; }
+  const loc = addItem('gold_bar',1); if(!loc){ showToast('กระเป๋า+ตู้เซฟเต็ม'); return; }
+  profile.diamonds -= GOLD_SHOP_PRICE; profile.goldShopMonth = thMonthKey();
+  await saveProfile(); await saveBagItems(); await saveWarehouseItems(); renderAll();
+  showToast('🥇 ซื้อทองแท่งแล้ว!');
+}
+function renderGoldShopNote(){
+  const n = document.getElementById('goldShopNote'), b = document.getElementById('goldShopBtn');
+  if(!n || !profile) return;
+  const done = profile.goldShopMonth === thMonthKey();
+  n.textContent = done ? 'เดือนนี้ซื้อแล้ว' : `${GOLD_SHOP_PRICE}💎 (เดือนละ 1)`;
+  if(b) b.disabled = done;
+}
+
+// =====================================================================
+// 🟥 ตัวแดง — ดักผู้เล่นเกิน 6 ครั้ง/วัน → ถ้าแพ้ยกทีม โอกาสของตก x2 (รีเซ็ต 00:00 น.)
+// =====================================================================
+const PVP_RED_AFTER = 6;
+function pvpTodayCount(){ return profile.pvpDay === thDayKey() ? (profile.pvpCount||0) : 0; }
+function isRed(){ return pvpTodayCount() > PVP_RED_AFTER; }
+function deathLossMult(){ return isRed() ? 2 : 1; }
+
+// =====================================================================
+// 👑 VIP: ล็อกของที่สวมใส่ 1 ชิ้นไม่ให้ตก (DNA / ชิ้นส่วน / อุปกรณ์)
+// =====================================================================
+function vipLockOptions(){
+  const out = [];
+  roster.forEach(ch=>{
+    if(ch.dnaGrade && ch.dna && ch.dna.length) out.push({ key:'dna:'+ch.id, label:`🧬 DNA ${ch.dnaGrade} ของ ${ch.name}` });
+    parts.filter(p=>p.equippedTo===ch.id).forEach(p=> out.push({ key:'part:'+p.id, label:`🦴 ${PART_SLOT_LABEL[p.slot]} ${p.grade} (${ch.name})` }));
+    equipment.filter(g=>g.equippedTo===ch.id).forEach(g=> out.push({ key:'gear:'+g.id, label:`⚔️ ${g.name} (${ch.name})` }));
+  });
+  return out;
+}
+function vipLockedKey(){ return isVip() ? (profile.vipLock||'') : ''; }
+function isWornLocked(w){
+  const k = vipLockedKey(); if(!k) return false;
+  if(w.type==='dna') return k === 'dna:'+w.ch.id;
+  if(w.type==='part') return k === 'part:'+w.p.id;
+  if(w.type==='gear') return k === 'gear:'+w.g.id;
+  return false;
+}
+async function setVipLock(val){
+  if(!isVip()){ showToast('ฟังก์ชันนี้สำหรับ VIP'); return; }
+  profile.vipLock = val || '';
+  await saveProfile(); renderVipPanel();
+  showToast(val ? '🔒 ล็อกของชิ้นนี้ไม่ให้ตกแล้ว' : 'ยกเลิกการล็อก');
+}
+
+// =====================================================================
+// ⚔️ PvP ดักปล้นในด่าน (ต้องมีเรดาห์ของด่านนั้น · ใช้ 1 ครั้งต่อการดัก)
+// =====================================================================
+const PVP_STAGES = ['school','campground','ruins'];
+const PVP_HERE_MS = 15*60000;
+let pvpBattle = null;
+let pvpView = { stage:null, targets:null, loading:false, err:'' };
+function buildPvpSnapshot(){
+  const ids = profile.lockedTeamIds || [];
+  const chars = ids.map(id=>roster.find(r=>r.id===id)).filter(Boolean).map(c=>({
+    id:c.id, name:c.name, faction:c.faction, level:c.level, dnaGrade:c.dnaGrade||null, dna:c.dna||[], stats:c.stats,
+    currentHp: c.currentHp!=null ? c.currentHp : c.stats.hp }));
+  const lock = vipLockedKey();
+  const worn = [];
+  ids.forEach(id=>{
+    const ch = roster.find(r=>r.id===id); if(!ch) return;
+    if(ch.dnaGrade && ch.dna && ch.dna.length && lock!=='dna:'+ch.id) worn.push({ type:'dna', charId:ch.id, grade:ch.dnaGrade, primaryFaction:ch.faction });
+    parts.filter(p=>p.equippedTo===ch.id && lock!=='part:'+p.id).forEach(p=> worn.push({ type:'part', part:{ id:p.id, slot:p.slot, faction:p.faction, grade:p.grade } }));
+    equipment.filter(g=>g.equippedTo===ch.id && lock!=='gear:'+g.id).forEach(g=>{ const { equippedTo:_e, ...gg } = g; worn.push({ type:'gear', gear:gg }); });
+  });
+  return { chars, red:isRed(), dia:Math.floor(profile.diamonds||0),
+    pool:{ bag:{...bagItems}, parts:parts.filter(p=>!p.equippedTo).map(p=>({id:p.id, slot:p.slot, faction:p.faction, grade:p.grade})),
+           dna:dnaPackages.map(d=>({id:d.id, grade:d.grade, primaryFaction:d.primaryFaction})) },
+    worn };
+}
+function pvpHereForTick(){
+  const f = profile && profile.lastFarm;
+  if(!f || !PVP_STAGES.includes(f.stage) || Date.now()-f.ts > PVP_HERE_MS || !profile.lockedTeamIds) return null;
+  return { stage:f.stage, snap:buildPvpSnapshot() };
+}
+// คำนวณของที่ตกจากทีมเป้าหมาย (ใช้กติกาเดียวกับโทษการตาย · ตัวแดง x2)
+function computePvpLoot(snap){
+  const mult = snap.red ? 2 : 1;
+  const loot = { dia:0, items:[] };
+  if(snap.dia>=1 && Math.random()*100 < DEATH_DIAMOND_DROP_CHANCE) loot.dia = Math.max(1, Math.floor(snap.dia*DEATH_DIAMOND_DROP_PCT/100));
+  if(Math.random()*100 < Math.min(100, DEATH_ITEM_LOSS_CHANCE*mult)){
+    const bag = {...(snap.pool.bag||{})}; let ps = [...(snap.pool.parts||[])], ds = [...(snap.pool.dna||[])];
+    const n = DEATH_ITEM_LOSS_MIN + Math.floor(Math.random()*(DEATH_ITEM_LOSS_MAX-DEATH_ITEM_LOSS_MIN+1));
+    for(let k=0;k<n;k++){
+      const pool = [];
+      Object.keys(bag).forEach(id=>{ if(bag[id]>0 && ITEM_DEFS[id]) pool.push({t:'item', id}); });
+      ps.forEach(p=>pool.push({t:'part', p})); ds.forEach(d=>pool.push({t:'dna', d}));
+      if(!pool.length) break;
+      const pick = pool[Math.floor(Math.random()*pool.length)];
+      if(pick.t==='item'){ bag[pick.id]--; loot.items.push({ kind:'item', itemId:pick.id, qty:1 }); }
+      else if(pick.t==='part'){ ps = ps.filter(x=>x.id!==pick.p.id); loot.items.push({ kind:'part', part:pick.p }); }
+      else { ds = ds.filter(x=>x.id!==pick.d.id); loot.items.push({ kind:'dna', pkg:pick.d }); }
+    }
+  }
+  if((snap.worn||[]).length && Math.random()*100 < Math.min(100, DEATH_EQUIPPED_LOSS_CHANCE*mult)){
+    const w = snap.worn[Math.floor(Math.random()*snap.worn.length)];
+    loot.items.push({ kind:'worn', w });
+  }
+  return loot;
+}
+function pvpLootLabel(x){
+  if(x.kind==='worn'){
+    const w = x.w;
+    if(w.type==='dna') return `🧬 DNA เกรด ${w.grade} (ที่ติดตั้งอยู่)`;
+    if(w.type==='part') return mktItemLabel({kind:'part', part:w.part})+' (ที่ใส่อยู่)';
+    return mktItemLabel({kind:'gear', gear:w.gear})+' (ที่ใส่อยู่)';
+  }
+  return mktItemLabel(x);
+}
+function receivePvpLoot(loot){
+  profile.diamonds += loot.dia||0;
+  (loot.items||[]).forEach(x=>{
+    if(x.kind!=='worn') return mktReceiveItem(x);
+    const w = x.w;
+    if(w.type==='dna') dnaPackages.push({ id:newId(), grade:w.grade, primaryFaction:w.primaryFaction, createdAt:Date.now() });
+    else if(w.type==='part') mktReceiveItem({ kind:'part', part:w.part });
+    else mktReceiveItem({ kind:'gear', gear:w.gear });
+  });
+}
+// ฝั่งเป้าหมาย: หักของที่ถูกปล้นออกจากบัญชี (ของที่ไม่มีแล้วจะข้ามไป)
+function applyPvpLoss(loot){
+  const lines = [];
+  if(loot.dia){ const d = Math.min(Math.floor(profile.diamonds), loot.dia); profile.diamonds -= d; if(d) lines.push(`💎 ${d}`); }
+  (loot.items||[]).forEach(x=>{
+    if(x.kind==='item'){ if(bagItems[x.itemId]>0){ bagItems[x.itemId]--; if(bagItems[x.itemId]<=0) delete bagItems[x.itemId]; lines.push(mktItemLabel(x)); } }
+    else if(x.kind==='part'){ if(parts.some(p=>p.id===x.part.id)){ parts = parts.filter(p=>p.id!==x.part.id); lines.push(mktItemLabel(x)); } }
+    else if(x.kind==='dna'){ if(dnaPackages.some(d=>d.id===x.pkg.id)){ dnaPackages = dnaPackages.filter(d=>d.id!==x.pkg.id); lines.push(mktItemLabel(x)); } }
+    else if(x.kind==='worn'){
+      const w = x.w;
+      if(w.type==='dna'){ const ch = roster.find(r=>r.id===w.charId); if(ch && ch.dnaGrade){ ch.dna=[]; ch.dnaGrade=null; normalizeAfterDNAChange(ch); lines.push(`🧬 DNA ของ ${ch.name}`); } }
+      else if(w.type==='part'){ const p = parts.find(pp=>pp.id===w.part.id); if(p){ const ch = roster.find(r=>r.id===p.equippedTo); parts = parts.filter(pp=>pp.id!==p.id); if(ch) recomputeStats(ch); lines.push(pvpLootLabel(x)); } }
+      else { const g = equipment.find(e=>e.id===w.gear.id); if(g){ const ch = roster.find(r=>r.id===g.equippedTo); equipment = equipment.filter(e=>e.id!==g.id); if(ch) recomputeStats(ch); lines.push(pvpLootLabel(x)); } }
+    }
+  });
+  return lines;
+}
+function radarUses(st){ return totalItemQty('radar_'+st); }
+function renderPvpPanel(){
+  const el = document.getElementById('pvpPanel'); if(!el || !profile) return;
+  if(!isOnlineMode() || !ON.token || battleActive){ el.style.display='none'; return; }
+  el.style.display='block';
+  const cnt = pvpTodayCount();
+  const shield = (profile.pvpShieldUntil||0) > Date.now() ? `🛡️ โล่กันโดนดักเหลือ ${Math.ceil((profile.pvpShieldUntil-Date.now())/60000)} นาที` : '';
+  const radars = PVP_STAGES.map(st=>`<button class="${radarUses(st)?'primary':'ghost'}" style="flex:1 1 30%;" onclick="pvpScan('${st}')" ${radarUses(st)?'':'disabled'}>📡 ${STAGES[st].name.replace('ด่าน','')}<br><span class="note" style="margin:0;">เหลือ ${radarUses(st)} ครั้ง</span></button>`).join('');
+  let list = '';
+  if(pvpView.stage){
+    if(pvpView.loading) list = `<div class="empty-msg">กำลังสแกน${STAGES[pvpView.stage].name}…</div>`;
+    else if(pvpView.err) list = `<div class="empty-msg">${esc(pvpView.err)}</div>`;
+    else if(pvpView.targets && !pvpView.targets.length) list = `<div class="empty-msg">ไม่พบผู้เล่นที่ดักได้ใน${STAGES[pvpView.stage].name} (เลเวลห่างไม่เกิน ±5 · ไม่มีโล่)</div>`;
+    else if(pvpView.targets) list = pvpView.targets.map(t=>`<div class="part-pick-item"><div><b style="${t.red?'color:var(--bad)':''}">${t.red?'🟥 ':''}${esc(t.n)}</b> · Lv.${t.lv} <span class="note">(ลงด่านเมื่อ ${t.ago} นาทีก่อน)</span>
+        <div class="note" style="margin:2px 0 0;">${t.team.map(c=>`${(FACTIONS[c.faction]||{}).icon||''} Lv.${c.level} ❤️${c.hp}/${c.maxHp}`).join(' · ')}</div></div>
+        <button class="diamond" onclick="pvpAttack('${esc(t.id)}')">ดัก!</button></div>`).join('');
+  }
+  el.innerHTML = `<h2>📡 ดักผู้เล่น (PvP)</h2>
+    <div class="note">ใช้เรดาห์ (ซื้อจากทหารผ่านศึกลึกลับ) สแกนหาผู้เล่นที่กำลังฟาร์มในด่าน · ดักได้เฉพาะเลเวลห่างไม่เกิน ±5 · ชนะได้ของที่อีกฝ่ายตก 100% · ใช้เรดาห์ 1 ครั้งต่อการดัก · คนที่โดนดักได้โล่ 60 นาที</div>
+    <div class="note">วันนี้ดักไปแล้ว <b>${cnt}</b> ครั้ง ${isRed()?'<b style="color:var(--bad)">🟥 ตัวแดง (แพ้ยกทีม โอกาสของตก x2)</b>':`(เกิน ${PVP_RED_AFTER} ครั้ง = ตัวแดง)`} ${shield}</div>
+    <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px;">${radars}</div>
+    <div style="margin-top:8px;">${list}</div>`;
+}
+async function pvpScan(st){
+  if(battleActive){ showToast('กำลังสู้อยู่'); return; }
+  if(!radarUses(st)){ showToast('ไม่มีเรดาห์ของด่านนี้'); return; }
+  pvpView = { stage:st, targets:null, loading:true, err:'' }; renderPvpPanel();
+  try{
+    const r = await onlineRpc({ a:'pvpScan', t:ON.token, stage:st });
+    if(r && r.ok) pvpView.targets = r.targets; else pvpView.err = (r && r.error) || 'สแกนไม่สำเร็จ';
+  } catch(e){ pvpView.err = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'; }
+  pvpView.loading = false; renderPvpPanel();
+}
+async function pvpAttack(targetId){
+  const st = pvpView.stage;
+  if(battleActive){ showToast('กำลังสู้อยู่'); return; }
+  if(!profile.lockedTeamIds){ showToast('ต้องยืนยันทีมก่อน'); return; }
+  const myChars = profile.lockedTeamIds.map(id=>roster.find(r=>r.id===id)).filter(Boolean);
+  if(!myChars.some(c=>(c.currentHp!=null?c.currentHp:c.stats.hp)>0)){ showToast('ทีมหมดเลือด ใช้น้ำยาเพิ่มเลือดก่อน'); return; }
+  if(!radarUses(st)){ showToast('ไม่มีเรดาห์ของด่านนี้'); return; }
+  let r; try{ r = await onlineRpc({ a:'pvpAttack', t:ON.token, stage:st, target:targetId }); } catch(e){ showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); return; }
+  if(!r || !r.ok){ showToast((r&&r.error)||'ดักไม่สำเร็จ'); pvpScan(st); return; }
+  await consumeItem('radar_'+st);
+  profile.pvpDay = thDayKey(); profile.pvpCount = r.count;
+  await saveProfile();
+  startPvpBattle(st, r.target, r.attackId);
+}
+function startPvpBattle(st, target, attackId){
+  battleActive = true;
+  pvpBattle = { stage:st, target, attackId, done:false };
+  warBattle = null; currentDiff = 'pvp'; battleTaxOwner = null; battleGuildBonus = null;
+  const myChars = profile.lockedTeamIds.map(id=>roster.find(r=>r.id===id)).filter(Boolean);
+  myChars.sort((a,b)=> getDNACount(b,'fulldef') - getDNACount(a,'fulldef'));
+  const meUnits = [];
+  myChars.forEach(c=>{ if(getFullSetFaction(c)==='zombie') meUnits.push(makeMinionUnit(c)); });
+  myChars.forEach(c=> meUnits.push(makeUnit(c,'me')));
+  const enUnits = (target.snap.chars||[]).map(c=>{
+    const ch = { ...c, id:'pvp_'+c.id, grade:c.dnaGrade||null };
+    const u = makeUnit(ch,'en');
+    u.curHp = Math.max(Math.round(ch.stats.hp*0.3), Math.min(ch.stats.hp, Math.round(c.currentHp||ch.stats.hp)));
+    u.alive = u.curHp>0;
+    return u;
+  });
+  enUnits.sort((a,b)=> getDNACount(b.char,'fulldef') - getDNACount(a.char,'fulldef'));
+  battleUnits = [...meUnits, ...enUnits];
+  roundQueue = []; battleOver = false; currentPhase = 1; bypassFront = {me:false, en:false};
+  const tabBtn = document.querySelector('#tabnav button[data-tab="battle"]'); if(tabBtn) tabBtn.click();
+  document.getElementById('battleSetup').style.display='none';
+  document.getElementById('battleWheelBox').style.display='none';
+  document.getElementById('stageSelect').style.display='none';
+  document.getElementById('pvpPanel').style.display='none';
+  document.getElementById('battleStage').style.display='block';
+  document.getElementById('sceneImg').style.backgroundImage = `url(${SCENES[STAGES[st].scene]})`;
+  document.getElementById('battleLog').innerHTML='';
+  logLine('sys', `📡 ดัก ${target.red?'🟥 ':''}${esc(target.n)} (Lv.${target.lv}) ที่${STAGES[st].name}! ทีมของเขาถูกควบคุมโดย AI`);
+  if(isRed()) logLine('sys', `🟥 คุณเป็นตัวแดง (ดักเกิน ${PVP_RED_AFTER} ครั้งวันนี้) — ถ้าแพ้ยกทีม โอกาสของตก x2`);
+  renderBattle();
+}
+async function endPvpBattle(result){
+  const pb = pvpBattle; if(!pb || pb.done) return;
+  pb.done = true; battleOver = true;
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  battleUnits.filter(u=>u.side==='me' && !u.isMinion).forEach(u=>{ u.char.currentHp = u.curHp; });
+  await saveRoster();
+  let loot = null;
+  if(result==='win'){
+    loot = computePvpLoot(pb.target.snap);
+    receivePvpLoot(loot);
+    logLine('sys', `🎉 ดักสำเร็จ! ${esc(pb.target.n)} แพ้ยกทีม (+1 คะแนนลีดเดอร์บอร์ดการสังหาร)`);
+    if(!loot.dia && !loot.items.length) logLine('sys', '💨 คู่ต่อสู้ไม่ได้ทำของตกในครั้งนี้');
+    if(loot.dia) logLine('sys', `💎 ได้เพชรที่ตก ${loot.dia}`);
+    loot.items.forEach(x=> logLine('sys', `🎁 ได้ ${pvpLootLabel(x)}`));
+    await saveProfile(); await saveBagItems(); await saveWarehouseItems(); await saveParts(); await saveEquipment(); await saveDNAPackages();
+  } else if(result==='lose'){
+    logLine('sys', `💀 ดักไม่สำเร็จ — ทีมเราแพ้ยกทีม`);
+    await applyDeathPenalty();
+  } else logLine('sys', '⚖️ เสมอ');
+  try{ await onlineRpc({ a:'pvpResult', t:ON.token, attackId:pb.attackId, win: result==='win', loot }); } catch(e){}
+  onlineFlush();
+  document.getElementById('btnStep').disabled = true;
+  renderAll();
+}
+
+// =====================================================================
+// 🗂️ ส่วนเสริมลีดเดอร์บอร์ดการสังหาร
+// =====================================================================
+const KILL_REWARD_TABLE = {
+  kd: [['1',100,4000,0],['2',50,2000,0],['3',25,1000,0],['4–10',10,500,0]],
+  km: [['1',500,10000,2],['2',250,5000,2],['3',125,2500,2],['4–10',40,1500,1]],
+};
+
+// =====================================================================
+// 🎯 เควสรายวัน/รายเดือน · แต้มกิจกรรม · เควสเซิร์ฟเวอร์ (ค่าทั้งหมดปรับได้ในชีทของ Apps Script)
+// =====================================================================
+const GCFG_DEFAULT = {
+  quests: [
+    {type:'d', id:'d_stamina', name:'ใช้สเตมิน่าครบ', target:30, dia:0, oil:2, heal:0, box:0, pts:1, on:true},
+    {type:'d', id:'d_nodeath', name:'ชนะด่านต่อเนื่องโดยไม่มีตัวไหนตาย', target:10, dia:0, oil:0, heal:5, box:0, pts:1, on:true},
+    {type:'d', id:'d_gacha', name:'สุ่มอะไรก็ได้ในกาชา', target:1, dia:5, oil:0, heal:0, box:0, pts:1, on:true},
+    {type:'d', id:'d_war', name:'ลงสู้สงครามกิล', target:1, dia:5, oil:0, heal:0, box:0, pts:1, on:true},
+    {type:'d', id:'d_lb', name:'ติดลีดเดอร์บอร์ดอะไรก็ได้ท็อป 10', target:1, dia:0, oil:0, heal:0, box:0, pts:1, on:true},
+    {type:'m', id:'m_stamina', name:'ใช้สเตมิน่าครบ', target:600, dia:0, oil:50, heal:0, box:0, pts:10, on:true},
+    {type:'m', id:'m_pipe', name:'ลงด่านท่อน้ำ', target:10, dia:100, oil:0, heal:0, box:0, pts:10, on:true},
+    {type:'m', id:'m_gacha', name:'สุ่มอะไรก็ได้ในกาชา', target:25, dia:100, oil:0, heal:0, box:0, pts:10, on:true},
+    {type:'m', id:'m_war', name:'ลงสู้สงครามกิล', target:20, dia:100, oil:0, heal:0, box:0, pts:10, on:true},
+    {type:'m', id:'m_lb', name:'ติดลีดเดอร์บอร์ดอะไรก็ได้ท็อป 10', target:10, dia:0, oil:0, heal:0, box:0, pts:10, on:true},
+    {type:'m', id:'m_vet', name:'เจอทหารผ่านศึกลึกลับ', target:5, dia:0, oil:0, heal:0, box:2, pts:10, on:true},
+    {type:'m', id:'m_cement', name:'ส่งปูนให้ทหารผ่านศึกลึกลับ', target:100, dia:200, oil:0, heal:0, box:0, pts:10, on:true},
+    {type:'m', id:'m_rebar', name:'ส่งเหล็กเส้นให้ทหารผ่านศึกลึกลับ', target:100, dia:200, oil:0, heal:0, box:0, pts:10, on:true},
+  ],
+  ex: [
+    {id:'ex_gold', name:'ทองแท่ง 1 แท่ง', pts:400, on:true},
+    {id:'ex_part', name:'ชิ้นส่วนอวัยวะ เกรด S–SSS (สุ่ม)', pts:600, on:true},
+    {id:'ex_dna', name:'สุ่ม DNA เกรด S–SSS', pts:800, on:true},
+    {id:'ex_blueprint', name:'ใบสุ่มแปลนคราฟอุปกรณ์', pts:1000, on:true},
+  ],
+  set: { sq_cement:10000, sq_rebar:10000, sq_points:100, sq_dia:250, sq_drop_pct:20, sq_drop_days:7,
+         gold_drop_ruins:0.1, gold_drop_pipe:0.5, build_drop_hospital:30, build_drop_school:40, build_drop_campground:50,
+         build_drop_ruins:60, build_drop_pipe:80, build_drop_max:3, vet_gold_sell:1800 },
+};
+let GCFG = JSON.parse(JSON.stringify(GCFG_DEFAULT));
+function cfgSet(k){ const v = GCFG.set && GCFG.set[k]; return v!=null ? Number(v) : Number(GCFG_DEFAULT.set[k]||0); }
+async function loadGameCfg(){
+  if(!isOnlineMode()) return;
+  try{
+    const r = await onlineRpc({ a:'cfg' });
+    if(r && r.ok && r.cfg){ GCFG = { quests:r.cfg.quests||GCFG_DEFAULT.quests, ex:r.cfg.ex||GCFG_DEFAULT.ex, set:{...GCFG_DEFAULT.set, ...(r.cfg.set||{})} }; renderQuestTab(); }
+  } catch(e){}
+}
+setInterval(loadGameCfg, 5*60000);
+
+// ---------- ความคืบหน้าเควส (เก็บใน profile) ----------
+function questState(){
+  if(!profile.quests) profile.quests = { day:'', month:'', d:{}, m:{}, dc:{}, mc:{}, streak:0 };
+  const q = profile.quests;
+  const day = thDayKey(), month = thMonthKey();
+  if(q.day !== day){ q.day = day; q.d = {}; q.dc = {}; }
+  if(q.month !== month){ q.month = month; q.m = {}; q.mc = {}; }
+  return q;
+}
+function questAdd(metric, n=1){
+  if(!profile) return;
+  const q = questState();
+  q.d[metric] = (q.d[metric]||0) + n;
+  q.m[metric] = (q.m[metric]||0) + n;
+}
+// ชนะ PvE: นับต่อเนื่องถ้าไม่มีนักสู้ตาย · แพ้/มีตัวตาย = เริ่มนับใหม่
+function questBattleResult(won, noDeath){
+  const q = questState();
+  q.streak = (won && noDeath) ? (q.streak||0)+1 : 0;
+  q.d.nodeath = Math.max(q.d.nodeath||0, q.streak);
+}
+function questProgress(qd){
+  const q = questState();
+  const metric = qd.id.slice(2);
+  return Math.min(qd.target, (qd.type==='d' ? q.d : q.m)[metric] || 0);
+}
+function questClaimed(qd){ const q = questState(); return !!(qd.type==='d' ? q.dc : q.mc)[qd.id]; }
+function questRewardText(qd){
+  const b = [];
+  if(qd.dia) b.push(`💎 ${qd.dia}`);
+  if(qd.oil) b.push(`🎒 เสบียง x${qd.oil}`);
+  if(qd.heal) b.push(`🧪 น้ำยา x${qd.heal}`);
+  if(qd.box) b.push(`📦 กล่องเก็บเงิน x${qd.box}`);
+  if(qd.pts) b.push(`🎫 ${qd.pts} แต้ม`);
+  return b.join(' · ');
+}
+function questGive(itemId, n){ for(let i=0;i<n;i++){ if(!addItem(itemId,1)) warehouseItems[itemId] = (warehouseItems[itemId]||0)+1; } }
+async function claimQuest(id){
+  const qd = GCFG.quests.find(x=>x.id===id && x.on);
+  if(!qd) return;
+  if(questClaimed(qd)){ showToast('รับรางวัลเควสนี้ไปแล้ว'); return; }
+  if(questProgress(qd) < qd.target){ showToast('ยังทำเควสไม่สำเร็จ'); return; }
+  const q = questState();
+  (qd.type==='d' ? q.dc : q.mc)[qd.id] = Date.now();
+  profile.diamonds += qd.dia||0;
+  profile.eventPts = (profile.eventPts||0) + (qd.pts||0);
+  questGive('oil', qd.oil||0); questGive('heal_potion', qd.heal||0); questGive('money_box', qd.box||0);
+  await saveProfile(); await saveBagItems(); await saveWarehouseItems();
+  renderAll(); renderQuestTab();
+  showToast(`🎯 รับรางวัล: ${questRewardText(qd)}`);
+}
+// ---------- แลกแต้มกิจกรรม ----------
+const EX_HIGH_GRADES = ['S','SS','SSS'];
+const EX_HIGH_WEIGHTS = [70, 25, 5];
+function exRollHighGrade(){ let r = Math.random()*100; for(let i=0;i<3;i++){ if(r < EX_HIGH_WEIGHTS[i]) return EX_HIGH_GRADES[i]; r -= EX_HIGH_WEIGHTS[i]; } return 'S'; }
+async function exchangePoints(id){
+  const ex = GCFG.ex.find(x=>x.id===id && x.on);
+  if(!ex) return;
+  if((profile.eventPts||0) < ex.pts){ showToast('แต้มกิจกรรมไม่พอ'); return; }
+  let msg = '';
+  if(id==='ex_part'){
+    if(partsInBag() >= PARTS_CAP){ showToast(`คลังชิ้นส่วนเต็ม (สูงสุด ${PARTS_CAP} ชิ้น)`); return; }
+    const p = { id:newId(), slot:PART_SLOTS[Math.floor(Math.random()*PART_SLOTS.length)], faction:randomFaction(), grade:exRollHighGrade(), equippedTo:null };
+    parts.push(p); await saveParts(); msg = `🦴 ชิ้นส่วน ${PART_SLOT_LABEL[p.slot]} เกรด ${p.grade}`;
+  } else if(id==='ex_dna'){
+    if(dnaPackages.length >= DNA_CAP){ showToast(`คลัง DNA เต็ม (สูงสุด ${DNA_CAP} ชิ้น)`); return; }
+    const pkg = makeDNAPackageFixedGrade(exRollHighGrade()); dnaPackages.push(pkg); await saveDNAPackages(); msg = `🧬 แพ็ค DNA เกรด ${pkg.grade}`;
+  } else if(id==='ex_gold'){ questGive('gold_bar',1); msg = '🥇 ทองแท่ง 1 แท่ง'; }
+  else if(id==='ex_blueprint'){ questGive('blueprint_ticket',1); msg = '📜 ใบสุ่มแปลนคราฟอุปกรณ์ 1 ใบ'; }
+  else return;
+  profile.eventPts -= ex.pts;
+  await saveProfile(); await saveBagItems(); await saveWarehouseItems();
+  renderAll(); renderQuestTab();
+  showToast(`🎟️ แลกได้ ${msg}`);
+}
+// ---------- เควสเซิร์ฟเวอร์ + โบนัสดรอป ----------
+function sqBonusPct(){ return (profile && (profile.sqBonusUntil||0) > Date.now()) ? (profile.sqBonusPct||cfgSet('sq_drop_pct')) : 0; }
+async function vetDonate(item){
+  if(!veteranActive()){ showToast('ทหารผ่านศึกลึกลับจากไปแล้ว'); return; }
+  if(!isOnlineMode() || !ON.token){ showToast('ต้องเล่นแบบออนไลน์'); return; }
+  const inp = document.getElementById('vetDon_'+item);
+  const have = totalItemQty(item);
+  const n = Math.min(have, Math.max(0, Math.floor(Number(inp && inp.value) || have)));
+  if(n<1){ showToast(`ไม่มี${ITEM_DEFS[item].name}`); return; }
+  for(let i=0;i<n;i++) await consumeItem(item);
+  let r; try{ r = await onlineRpc({ a:'sqDonate', t:ON.token, item, qty:n }); } catch(e){ r = null; }
+  if(!r || !r.ok){ questGive(item, n); await saveBagItems(); await saveWarehouseItems(); showToast((r&&r.error)||'ส่งไม่สำเร็จ เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); return; }
+  questAdd(item, n);
+  if(profile.sq && r.sq){ profile.sq.cement = r.sq.cement; profile.sq.rebar = r.sq.rebar; profile.sq.doneAt = r.sq.doneAt; }
+  await saveProfile(); onlineFlush(); renderAll(); openVeteranShop();
+  showToast(`ส่ง${ITEM_DEFS[item].name} ${n} หน่วยให้ทหารผ่านศึกแล้ว`);
+  if(r.sq && r.sq.doneAt) onlineTick();
+}
+async function vetSellGold(){
+  if(!veteranActive()){ showToast('ทหารผ่านศึกลึกลับจากไปแล้ว'); return; }
+  const price = cfgSet('vet_gold_sell');
+  if(bagQty('gold_bar') < 1){ showToast('ต้องพกทองแท่งไว้ในกระเป๋า'); return; }
+  await takeFromBag('gold_bar', 1);
+  profile.diamonds += price;
+  await saveProfile(); renderAll(); openVeteranShop();
+  showToast(`🥇 ขายทองแท่งได้ 💎 ${price.toLocaleString()}`);
+}
+// ---------- ของดรอปใหม่ (เรียกจาก endBattle ตอนชนะ PvE) ----------
+function questExtraDrops(stageKey, dropLines){
+  const mult = 1 + sqBonusPct()/100;
+  const bc = cfgSet('build_drop_'+stageKey) * mult;
+  if(bc>0 && Math.random()*100 < bc){
+    const item = Math.random()<0.5 ? 'cement' : 'rebar';
+    const n = 1 + Math.floor(Math.random()*Math.max(1, cfgSet('build_drop_max')));
+    if(addItem(item, n)) dropLines.push(`${ITEM_DEFS[item].icon} ${ITEM_DEFS[item].name} x${n}`);
+    else dropLines.push(`⚠️ กระเป๋า+คลังเต็มหมด ไม่ได้รับ ${ITEM_DEFS[item].name}`);
+  }
+  const gc = (stageKey==='ruins' ? cfgSet('gold_drop_ruins') : stageKey==='pipe' ? cfgSet('gold_drop_pipe') : 0) * mult;
+  if(gc>0 && Math.random()*100 < gc){
+    if(addItem('gold_bar',1)) dropLines.push(`🥇 ทองแท่ง x1 !!! (โอกาสหายากมาก)`);
+    else { warehouseItems.gold_bar = (warehouseItems.gold_bar||0)+1; dropLines.push(`🥇 ทองแท่ง x1 !!! (เก็บเข้าตู้เซฟ)`); }
+  }
+}
+// ---------- หน้าเควส ----------
+function renderQuestTab(){
+  const el = document.getElementById('questRoot'); if(!el || !profile) return;
+  const q = questState();
+  const bar = (v,t)=>`<div style="height:6px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;margin-top:4px;"><div style="height:100%;width:${Math.min(100,Math.round(v/t*100))}%;background:var(--accent);"></div></div>`;
+  const qrow = qd=>{
+    const v = questProgress(qd), done = v>=qd.target, got = questClaimed(qd);
+    return `<div class="part-pick-item"><div style="flex:1;min-width:0;">${esc(qd.name)} <b>${v.toLocaleString()}/${qd.target.toLocaleString()}</b>
+      <div class="note" style="margin:2px 0 0;">${questRewardText(qd)}</div>${bar(v,qd.target)}</div>
+      <button class="${done&&!got?'diamond':'ghost'}" onclick="claimQuest('${qd.id}')" ${done&&!got?'':'disabled'}>${got?'รับแล้ว':done?'รับ':'ยังไม่ครบ'}</button></div>`;
+  };
+  const ds = GCFG.quests.filter(x=>x.type==='d' && x.on), ms = GCFG.quests.filter(x=>x.type==='m' && x.on);
+  const sq = profile.sq || null;
+  const tc = sq ? sq.tc : cfgSet('sq_cement'), tr = sq ? sq.tr : cfgSet('sq_rebar');
+  const bonus = sqBonusPct();
+  const sqHtml = sq ? `
+      <div class="part-pick-item"><div style="flex:1;">🧱 ปูน <b>${(sq.cement||0).toLocaleString()}/${tc.toLocaleString()}</b>${bar(sq.cement||0,tc)}</div></div>
+      <div class="part-pick-item"><div style="flex:1;">🔩 เหล็กเส้น <b>${(sq.rebar||0).toLocaleString()}/${tr.toLocaleString()}</b>${bar(sq.rebar||0,tr)}</div></div>
+      ${sq.doneAt ? `<div class="note">✅ สำเร็จแล้ว! ทุกคนได้รับรางวัลอัตโนมัติ</div>` : ''}`
+    : `<div class="empty-msg">${isOnlineMode()?'กำลังโหลด…':'ต้องเล่นแบบออนไลน์'}</div>`;
+  el.innerHTML = `<div class="panel">
+      <h2>🎫 แต้มกิจกรรม: <span style="color:var(--accent)">${(profile.eventPts||0).toLocaleString()}</span></h2>
+      <div class="note">ทำเควสเพื่อสะสมแต้ม แล้วนำไปแลกของด้านล่าง</div>
+      ${bonus ? `<div class="note" style="color:var(--accent)">🎉 โบนัสเควสเซิร์ฟเวอร์: อัตราดรอป +${bonus}% ถึง ${fmtThDate(profile.sqBonusUntil)}</div>` : ''}
+    </div>
+    <div class="panel"><h2>📅 เควสรายวัน</h2><div class="note">รีเซ็ตทุกวัน 00:00 น. · ชนะต่อเนื่องตอนนี้ ${q.streak||0} ด่าน</div>${ds.map(qrow).join('')||'<div class="empty-msg">ไม่มีเควส</div>'}</div>
+    <div class="panel"><h2>🗓️ เควสรายเดือน</h2><div class="note">รีเซ็ตวันที่ 1 ของเดือน · ส่งปูน/เหล็กเส้นได้ตอนเจอทหารผ่านศึกลึกลับ</div>${ms.map(qrow).join('')||'<div class="empty-msg">ไม่มีเควส</div>'}</div>
+    <div class="panel"><h2>🏗️ เควสเซิร์ฟเวอร์ (ทั้งเซิร์ฟช่วยกัน)</h2>
+      <div class="note">ทั้งเซิร์ฟช่วยกันส่งปูนและเหล็กเส้นให้ทหารผ่านศึกลึกลับให้ครบภายในเดือนนี้ → ทุกคนได้ 🎫 ${cfgSet('sq_points')} แต้ม + 💎 ${cfgSet('sq_dia')} และอัตราดรอป +${cfgSet('sq_drop_pct')}% นาน ${cfgSet('sq_drop_days')} วัน</div>
+      ${sqHtml}</div>
+    <div class="panel"><h2>🎟️ แลกแต้มกิจกรรม</h2>
+      ${GCFG.ex.filter(x=>x.on).map(x=>`<div class="part-pick-item"><div>${esc(x.name)}<div class="note" style="margin:2px 0 0;">🎫 ${x.pts.toLocaleString()} แต้ม</div></div>
+        <button class="diamond" onclick="exchangePoints('${x.id}')" ${(profile.eventPts||0)<x.pts?'disabled':''}>แลก</button></div>`).join('')}
+      <div class="note">ชิ้นส่วน/DNA สุ่มเกรด S 70% · SS 25% · SSS 5% · ใบสุ่มแปลนคราฟเก็บไว้ใช้กับระบบคราฟอุปกรณ์ที่จะมาในอนาคต</div>
+    </div>`;
+}
+
 // ---------- tabs ----------
 document.querySelectorAll('#tabnav button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
+    if(battleActive && btn.dataset.tab!=='battle'){ showToast('⚔️ ระหว่างต่อสู้ใช้เมนูอื่นไม่ได้ — ปิดไฟต์ก่อน'); return; }
     document.querySelectorAll('#tabnav button').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     const tab = btn.dataset.tab;
@@ -5301,6 +5938,7 @@ document.querySelectorAll('#tabnav button').forEach(btn=>{
     if(tab==='guild'){ renderGuildTab(); refreshGuildData(); }
     if(tab==='market'){ renderTopupPanel(); loadTopupInfo(); mktLoad(); }
     if(tab==='rank'){ lbLoad(); }
+    if(tab==='quest'){ renderQuestTab(); onlineTick(); }
   });
 });
 
@@ -5314,6 +5952,7 @@ function guardAsync(fn){
       showToast('กำลังทำรายการอยู่ กรุณารอสักครู่');
       return;
     }
+    if(battleActive){ showToast('⚔️ ระหว่างต่อสู้ใช้ฟังก์ชันอื่นไม่ได้ — ปิดไฟต์ก่อน'); return; }
     __actionBusy = true;
     try{
       return await fn.apply(this, args);
@@ -5374,6 +6013,17 @@ guildUpgrade = guardAsync(guildUpgrade);
 setGuildVice = guardAsync(setGuildVice);
 buyWarAttempt = guardAsync(buyWarAttempt);
 startWarBattle = guardAsync(startWarBattle);
+vetBuyDnaBox = guardAsync(vetBuyDnaBox);
+vetBuyRadar = guardAsync(vetBuyRadar);
+vetMoneyBoxService = guardAsync(vetMoneyBoxService);
+vetBuyGold = guardAsync(vetBuyGold);
+buyGoldBarShop = guardAsync(buyGoldBarShop);
+setVipLock = guardAsync(setVipLock);
+pvpAttack = guardAsync(pvpAttack);
+claimQuest = guardAsync(claimQuest);
+exchangePoints = guardAsync(exchangePoints);
+vetDonate = guardAsync(vetDonate);
+vetSellGold = guardAsync(vetSellGold);
 
 // ---------- 🪙 → รูปเหรียญ: แปลงทุกที่ที่มีอีโมจิเหรียญในหน้าเกมเป็นรูปเหรียญอัตโนมัติ ----------
 const COIN_IMG = 'data:image/webp;base64,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';
