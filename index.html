@@ -1375,9 +1375,9 @@ function renderGuide(){
   secs.push(gSec('🏆 แข่งขัน: อารีน่า · บอสโลก · หอคอย · ค่าหัว · แชท', `
     <b>⚔️ อารีน่า:</b> สู้กับทีมของผู้เล่นอื่น (AI ควบคุม) วันละ ${cfgSet('arena_daily')} ครั้ง (ซื้อเพิ่ม ${cfgSet('arena_extra_price')}💎/ครั้ง) · เรตติ้งเริ่ม 1000 ชนะ/แพ้ ได้/เสียแต้มตามความต่างเรต · ซีซันจบทุกวันจันทร์ แจกรางวัลท็อป 10 · ไม่มีของตก ไม่เสียเลือดจริง<br>
     <b>👹 บอสโลก:</b> บอสตัวใหม่ทุกวันจันทร์ ทั้งเซิร์ฟช่วยกันตี วันละ ${cfgSet('wb_daily')} ครั้ง · ปราบได้ = ทุกคนที่ร่วมตีได้เพชร+เหรียญ (ดูในหน้าบอสโลก) · ท็อปดาเมจรายสัปดาห์ได้รางวัลเพิ่ม<br>
-    <b>🗼 หอคอยไม่รู้จบ:</b> ปีนวันละ ${cfgSet('tower_daily')} รอบ เลือดต่อเนื่องทุกชั้น (ใช้น้ำยาระหว่างชั้นได้) · ทุก 5 ชั้นได้เหรียญ ทุก 10 ชั้นได้เพชร (ครั้งแรกของเดือน) · อันดับชั้นสูงสุดรายเดือน<br>
+    <b>🗼 หอคอยไม่รู้จบ:</b> ปีนวันละ ${cfgSet('tower_daily')} รอบ เลือดต่อเนื่องทุกชั้น (ใช้น้ำยาระหว่างชั้นได้) · ทุก 5 ชั้นได้เหรียญ ทุก 10 ชั้นได้เพชร (ครั้งแรกของเดือน) · อันดับชั้นสูงสุดรายเดือน (ต้องถึงชั้น ${cfgSet('tw_min_floor')} ขึ้นไปถึงจะได้รางวัลอันดับ)<br>
     <b>☠️ ล่านักล่า:</b> ดักคนที่เคยดักคนอื่นสำเร็จ แล้วชนะ = ได้ 💎 ${cfgSet('pvp_hunt_dia')} ต่อ 1 คนที่เขาล่ามา (สูงสุด ${cfgSet('pvp_hunt_cap')}💎) แล้วนับของเขาใหม่จาก 0<br>
-    <b>🎯 ค่าหัว:</b> ตั้งค่าหัวผู้เล่นด้วยเพชร (ขั้นต่ำ ${cfgSet('bounty_min')}💎) · ตัวแดงโดนระบบตั้งให้อัตโนมัติ · ใครดักเป้าหมายชนะ ได้ค่าหัวทั้งหมด<br>
+    <b>🎯 ค่าหัว:</b> ตั้งค่าหัวผู้เล่นด้วยเพชร (ขั้นต่ำ ${cfgSet('bounty_min')}💎) · ตัวแดงโดนระบบตั้งให้อัตโนมัติ · คนล่าที่ดักชนะได้ ${cfgSet('bounty_hunt_pct')}% ของค่าหัว · ถ้าเป้าหมายรอดครบ ${cfgSet('bounty_hours')} ชม.โดยไม่ถูกล่า ได้ ${cfgSet('bounty_survive_pct')}% ของค่าหัว (ค่าหัวจากระบบก็ได้เหมือนกัน)<br>
     <b>🏰 ครองโซนประจำสัปดาห์:</b> กิลที่ครองแต่ละโซนได้นานที่สุดในสัปดาห์ สมาชิกทุกคนได้เพชร+เหรียญ+แต้มกิล และกิลได้ EXP (ดูในหน้าอันดับ → ครองโซน)<br>
     <b>🏗️ อันดับผู้ช่วยเควส:</b> ส่งปูน/เหล็กเส้นให้ทหารมากที่สุดในเดือน ท็อป 10 ได้รางวัล<br>
     <b>💬 แชท:</b> ปุ่ม 💬 มุมขวาล่าง คุยได้ทั้งเซิร์ฟ และในกิล`));
@@ -5383,6 +5383,7 @@ async function onlineTick(){
       if(x.pts || x.gexp) await addLedger(x.gid, { t:'warweek', pid:profile.playerId, name:profile.playerName, zone:x.zone, pts:x.pts||0, gexp:x.gexp||0 });
       lines.push(`🏰 กิล "${esc(x.gname)}" ครอง${esc(zoneName(x.zone))}นานสุดประจำสัปดาห์ (${x.hours} ชม.) → 💎 ${x.dia} · 🪙 ${(x.coin||0).toLocaleString()} · แต้มกิล +${x.pts}${x.gexp?` · EXP กิล +${x.gexp}`:''}`);
     }
+    if(r.bountySurvive && r.bountySurvive.amt>0){ profile.diamonds += r.bountySurvive.amt; lines.push(`🛡️ รอดจากค่าหัว ${r.bountySurvive.total.toLocaleString()}💎 ครบเวลา! ได้รับ 💎 ${r.bountySurvive.amt.toLocaleString()}`); }
     (r.arenaNotes||[]).forEach(x=>{ lines.push(x.win ? `🛡️ ทีมของคุณป้องกันอารีน่าจาก ${esc(x.by)} สำเร็จ (เรต +${x.d})` : `⚔️ ${esc(x.by)} ชนะทีมของคุณในอารีน่า (เรต ${x.d})`); });
     if(r.sq){
       profile.sq = { cement:r.sq.cement, rebar:r.sq.rebar, tc:r.sq.tc, tr:r.sq.tr, doneAt:r.sq.doneAt };
@@ -5977,7 +5978,7 @@ function renderPvpPanel(){
     if(pvpView.loading) list = `<div class="empty-msg">กำลังสแกน${STAGES[pvpView.stage].name}…</div>`;
     else if(pvpView.err) list = `<div class="empty-msg">${esc(pvpView.err)}</div>`;
     else if(pvpView.targets && !pvpView.targets.length) list = `<div class="empty-msg">ไม่พบผู้เล่นที่ดักได้ใน${STAGES[pvpView.stage].name} (ต้องลงฟาร์มด่านนี้ใน 5 นาทีล่าสุด · ไม่มีโล่)</div>`;
-    else if(pvpView.targets) list = pvpView.targets.map(t=>`<div class="part-pick-item"><div><b style="${t.red?'color:var(--bad)':''}">${t.red?'🟥 ':''}${esc(t.n)}</b> · Lv.${t.lv}${t.bounty?` · <b style="color:var(--g-c)">🎯 ค่าหัว ${t.bounty}💎</b>`:''}${t.kills?` · <b style="color:var(--bad)">☠️ ล่ามาแล้ว ${t.kills} คน (+${Math.min(cfgSet('pvp_hunt_cap'), t.kills*cfgSet('pvp_hunt_dia'))}💎)</b>`:''} <span class="note">(ลงด่านเมื่อ ${t.ago} นาทีก่อน)</span>
+    else if(pvpView.targets) list = pvpView.targets.map(t=>`<div class="part-pick-item"><div><b style="${t.red?'color:var(--bad)':''}">${t.red?'🟥 ':''}${esc(t.n)}</b> · Lv.${t.lv}${t.bounty?` · <b style="color:var(--g-c)">🎯 ค่าหัว ${t.bounty}💎 (ล่าได้ ${Math.floor(t.bounty*cfgSet('bounty_hunt_pct')/100)}💎)</b>`:''}${t.kills?` · <b style="color:var(--bad)">☠️ ล่ามาแล้ว ${t.kills} คน (+${Math.min(cfgSet('pvp_hunt_cap'), t.kills*cfgSet('pvp_hunt_dia'))}💎)</b>`:''} <span class="note">(ลงด่านเมื่อ ${t.ago} นาทีก่อน)</span>
         <div class="note" style="margin:2px 0 0;">${t.team.map(c=>`${(FACTIONS[c.faction]||{}).icon||''} Lv.${c.level} ❤️${c.hp}/${c.maxHp}`).join(' · ')}</div></div>
         <button class="diamond" onclick="pvpAttack('${esc(t.id)}')">ดัก!</button></div>`).join('');
   }
@@ -6096,7 +6097,7 @@ const LB_UNIT = { kd:'คิล', km:'คิล', ar:'เรต', wb:'ดาเ�
 const LB_TITLE = { h:'การล่ารายชั่วโมง', d:'การล่ารายวัน', w:'การล่ารายสัปดาห์', m:'การล่ารายเดือน', kd:'การสังหารรายวัน', km:'การสังหารรายเดือน',
   ar:'อารีน่า (ซีซันรายสัปดาห์)', wb:'ดาเมจบอสโลก (รายสัปดาห์)', tw:'หอคอย (รายเดือน)', sqc:'ผู้ช่วยเควสเซิร์ฟเวอร์ (รายเดือน)' };
 const LB_NOTE = { ar:'จัดอันดับตามเรตติ้งอารีน่า · ซีซันจบทุกวันจันทร์ 00:00 น.', wb:'จัดอันดับตามดาเมจรวมที่ทำใส่บอสโลกในสัปดาห์นี้',
-  tw:'จัดอันดับตามชั้นสูงสุดที่ปีนได้ในเดือนนี้', sqc:'จัดอันดับตามจำนวนปูน+เหล็กเส้นที่ส่งให้ทหารผ่านศึกในเดือนนี้',
+  tw:'จัดอันดับตามชั้นสูงสุดที่ปีนได้ในเดือนนี้ (ต้องถึงชั้น 30+ ถึงได้รางวัล)', sqc:'จัดอันดับตามจำนวนปูน+เหล็กเส้นที่ส่งให้ทหารผ่านศึกในเดือนนี้',
   kd:'นับ 1 คิล ทุกครั้งที่ดักผู้เล่นอื่นแล้วชนะ', km:'นับ 1 คิล ทุกครั้งที่ดักผู้เล่นอื่นแล้วชนะ' };
 
 // =====================================================================
@@ -6124,7 +6125,7 @@ const GCFG_DEFAULT = {
     {id:'ex_dna', name:'สุ่ม DNA เกรด S–SSS', pts:800, on:true},
     {id:'ex_blueprint', name:'ใบสุ่มแปลนคราฟอุปกรณ์', pts:1000, on:true},
   ],
-  set: { sq_cement:10000, sq_rebar:10000, sq_points:100, sq_dia:250, sq_drop_pct:20, sq_drop_days:7,
+  set: { bounty_hunt_pct:60, bounty_survive_pct:20, bounty_hours:24, tw_min_floor:30, sq_cement:10000, sq_rebar:10000, sq_points:100, sq_dia:250, sq_drop_pct:20, sq_drop_days:7,
          gold_drop_ruins:0.1, gold_drop_pipe:0.5, build_drop_hospital:30, build_drop_school:40, build_drop_campground:50,
          build_drop_ruins:60, build_drop_pipe:80, build_drop_max:3, vet_gold_sell:1000, pvp_hunt_dia:20, pvp_hunt_cap:1000 },
 };
@@ -6515,7 +6516,7 @@ async function arenaFinish(result, mb){
 // =====================================================================
 // 👹 บอสโลก
 // =====================================================================
-const WB_FIGHT_HP = 9999999, WB_MAX_ROUNDS = 15;
+const WB_FIGHT_HP = 9999999, WB_MAX_ROUNDS = 50;
 const BOSS_POISON_BASE_HP = 20000;
 let wbView = { data:null, err:'', top:null };
 async function wbLoad(){
@@ -6627,6 +6628,7 @@ function renderTower(){
     ${run ? '' : `<div class="panel"><button class="primary big" style="width:100%;" onclick="towerStart()" ${(t.runs||0)>=limit?'disabled':''}>🧗 เริ่มปีนจากชั้น 1</button>
       <div class="note">ใช้ทีมที่ยืนยันไว้ เริ่มเลือดเต็ม (ไม่กระทบเลือดจริง ไม่มีโทษการตาย) · ศัตรูเก่งขึ้นทุกชั้น ทุก 10 ชั้นเป็นชั้นบอส · แพ้ = จบรอบ</div></div>`}
     <div class="panel"><h2>🎁 รางวัลชั้น (ครั้งแรกของเดือน)</h2><div>${ms}</div>
+      <div class="note">⚠️ รางวัลอันดับหอคอยรายเดือน ต้องปีนถึงอย่างน้อยชั้น ${cfgSet('tw_min_floor')}${(t.best||0)>=cfgSet('tw_min_floor')?' ✅ คุณผ่านเกณฑ์แล้ว':` (ตอนนี้ ${t.best||0})`}</div>
       <div style="margin-top:10px;">${gTable(['อันดับเดือนนี้','รางวัล'], KILL_REWARD_TABLE.tw.map(r=>[`อันดับ ${r[0]}`, rewardTxt(r)]))}</div></div>`;
 }
 async function towerStart(){
@@ -6702,11 +6704,12 @@ function renderBounty(){
       <div class="opp-av">🎯</div>
       <div class="opp-info"><b>${esc(b.n)}${b.me?' (คุณ)':''}</b> <span class="note" style="margin:0;">Lv.${b.lv}</span>
         <div class="note" style="margin:0;">${b.where ? `📍 กำลังฟาร์มที่${STAGES[b.where].name} — ใช้เรดาห์ดักได้ตอนนี้!` : 'ไม่ได้อยู่ในด่าน'}</div>
+        <div class="note" style="margin:0;">${b.exp?`⏳ เหลือ ${Math.max(0,Math.ceil((b.exp-Date.now())/3600000))} ชม. · `:''}ล่าได้ ${Math.floor(b.amt*cfgSet('bounty_hunt_pct')/100)}💎 · รอดได้ ${Math.floor(b.amt*cfgSet('bounty_survive_pct')/100)}💎</div>
         <div class="note" style="margin:0;">${b.last.map(x=>`${esc(x.by)} +${x.amt}`).join(' · ')}</div></div>
       <div class="bounty-amt">💎 ${b.amt.toLocaleString()}</div></div>`).join('') : '<div class="empty-msg">ยังไม่มีค่าหัว</div>')
     : `<div class="empty-msg">${esc(bountyView.err||'กำลังโหลด…')}</div>`;
   el.innerHTML = `<div class="hero-card"><div class="hero-ic">🎯</div><div style="flex:1;"><h2 style="margin:0;">กระดานค่าหัว</h2>
-      <div class="note" style="margin:0;">ดักผู้เล่นที่มีค่าหัวแล้วชนะ = ได้ค่าหัวทั้งหมด · ตัวแดงถูกระบบตั้งค่าหัวให้อัตโนมัติ ${cfgSet('bounty_auto')}💎 ทุกครั้งที่ดักเกินกำหนด</div></div></div>
+      <div class="note" style="margin:0;">ดักผู้เล่นที่มีค่าหัวแล้วชนะ = ได้ ${cfgSet('bounty_hunt_pct')}% ของค่าหัว · รอดครบ ${cfgSet('bounty_hours')} ชม.ไม่ถูกล่า = เจ้าตัวได้ ${cfgSet('bounty_survive_pct')}% · ตัวแดงถูกระบบตั้งค่าหัวให้อัตโนมัติ ${cfgSet('bounty_auto')}💎 ทุกครั้งที่ดักเกินกำหนด</div></div></div>
     <div class="panel"><h2>💰 ตั้งค่าหัว</h2>
       <div class="row"><input id="btyName" placeholder="ชื่อผู้เล่น"><input id="btyAmt" type="number" min="${min}" placeholder="≥${min} 💎" style="flex:0 0 96px;"><button class="diamond" style="flex:0 0 auto;" onclick="bountyPlace()">ตั้ง</button></div>
       <div class="note">ใช้เพชรของคุณ (ขั้นต่ำ ${min}💎) · ตั้งซ้ำให้คนเดิมได้ ค่าหัวสะสมรวมกัน · ไม่คืนเพชร</div></div>
