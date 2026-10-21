@@ -728,6 +728,50 @@
 // 🎮 Discord: ลิงก์ Cloudflare Worker ของบอท (เช่น https://fight5-discord.xxx.workers.dev) — เว้นว่าง = ซ่อนปุ่ม Discord
 const DC_WORKER_URL = 'https://fight5-discord.firstsaber0608.workers.dev';
 const IN_DC_ACTIVITY = /\.discordsays\.com$/.test(location.hostname);   // เปิดเกมอยู่ใน Discord Activity
+// 🎮 Discord Activity: Discord บล็อก onclick="..." ในหน้า (CSP) และบล็อกกล่อง confirm/alert/prompt
+//  → ตรวจแล้วเปิดตัวช่วยรันปุ่มแทน + เปลี่ยนการยืนยันเป็น "กดซ้ำอีกครั้งภายใน 5 วิ"
+(function dcInlineFix(){
+  function enable(){
+    const types = ['click','change','input','submit'];
+    types.forEach(type=>{
+      document.addEventListener(type, ev=>{
+        const attr = 'on'+type;
+        let el = ev.target;
+        while(el && el !== document && el.nodeType === 1){
+          if(el.hasAttribute(attr)){
+            try{ const r = (new Function('event', el.getAttribute(attr))).call(el, ev); if(r === false) ev.preventDefault(); }catch(e){ console.error('[inline '+attr+']', e); }
+            if(ev.cancelBubble) break;
+          }
+          el = el.parentNode;
+        }
+      });
+    });
+    window.__dcInlineFix = true;
+  }
+  function test(){
+    try{
+      window.__dcInlineOk = false;
+      const b = document.createElement('button');
+      b.setAttribute('onclick', 'window.__dcInlineOk=true');
+      b.style.display = 'none'; document.documentElement.appendChild(b); b.click(); b.remove();
+      if(!window.__dcInlineOk) enable();
+    }catch(e){ enable(); }
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', test, { once:true }); else test();
+  if(/\.discordsays\.com$/.test(location.hostname)){
+    let last = { msg:'', t:0 };
+    const toast = m => { try{ showToast(m); }catch(e){} };
+    window.confirm = function(msg){
+      msg = String(msg||'');
+      if(last.msg === msg && Date.now() - last.t < 5000){ last = { msg:'', t:0 }; return true; }
+      last = { msg, t:Date.now() };
+      toast('❓ ' + msg.split('\n')[0].slice(0,80) + ' — กดซ้ำอีกครั้งเพื่อยืนยัน');
+      return false;
+    };
+    window.alert = function(msg){ toast(String(msg||'').slice(0,120)); };
+    window.prompt = function(msg, def){ return def != null ? String(def) : ''; };
+  }
+})();
 let DC_BASE = IN_DC_ACTIVITY ? '/.proxy/api' : DC_WORKER_URL.replace(/\/+$/,'');   // Activity: ต้องเรียกผ่าน /.proxy/ (ถ้าไม่ได้จะลอง /api)
 const ONLINE_API_URL = 'https://script.google.com/macros/s/AKfycbx8uVFYWVV5JdpY8toRZMummV4mZhNft3SrX_hqOiJrPkNMpEdVsdwFNpEOcOued7vc/exec';   // ← ใส่ลิงก์ Web App (…/exec) ตรงนี้ ถ้าจะแจกไฟล์ให้เปิดนอก Apps Script
 
