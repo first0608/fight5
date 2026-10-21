@@ -726,7 +726,7 @@
    ข้อมูลส่วนรวม (กิล/สงคราม) อ่านจากชีทสดทุกครั้ง และรวมหลายคำขอเป็นชุดเดียวกันอัตโนมัติ
    ========================================================= */
 // 🎮 Discord: ลิงก์ Cloudflare Worker ของบอท (เช่น https://fight5-discord.xxx.workers.dev) — เว้นว่าง = ซ่อนปุ่ม Discord
-const DC_WORKER_URL = '';
+const DC_WORKER_URL = 'https://fight5-discord.firstsaber0608.workers.dev';
 const IN_DC_ACTIVITY = /\.discordsays\.com$/.test(location.hostname);   // เปิดเกมอยู่ใน Discord Activity
 const DC_BASE = IN_DC_ACTIVITY ? '/api' : DC_WORKER_URL.replace(/\/+$/,'');
 const ONLINE_API_URL = 'https://script.google.com/macros/s/AKfycbx8uVFYWVV5JdpY8toRZMummV4mZhNft3SrX_hqOiJrPkNMpEdVsdwFNpEOcOued7vc/exec';   // ← ใส่ลิงก์ Web App (…/exec) ตรงนี้ ถ้าจะแจกไฟล์ให้เปิดนอก Apps Script
