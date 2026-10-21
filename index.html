@@ -1007,8 +1007,18 @@ async function dcLoadSdk(){
   if(!document.getElementById('dcSdkCode') && document.readyState === 'loading') await new Promise(r=>document.addEventListener('DOMContentLoaded', r, { once:true }));
   const el = document.getElementById('dcSdkCode');
   if(!el) throw new Error('ไม่พบ Discord SDK ในหน้าเกม');
-  const sc = document.createElement('script'); sc.textContent = el.textContent; document.head.appendChild(sc);
-  if(typeof window.DiscordSDK !== 'function') throw new Error('โหลด Discord SDK ไม่สำเร็จ');
+  const code = el.textContent;
+  let errMsg = '';
+  // วิธีที่ 1: แทรกเป็นสคริปต์ (จับ error ที่เกิดระหว่างรันไว้แสดง)
+  const onErr = ev => { errMsg = errMsg || ('script: ' + (ev.message || ev.error || 'error')); };
+  window.addEventListener('error', onErr);
+  try{ const sc = document.createElement('script'); sc.textContent = code; document.head.appendChild(sc); }catch(e){ errMsg = 'inject: ' + e.message; }
+  window.removeEventListener('error', onErr);
+  // วิธีที่ 2: ถ้าวิธีแรกถูกบล็อก (CSP) ลองรันด้วย eval
+  if(typeof window.DiscordSDK !== 'function'){
+    try{ (0, eval)(code); }catch(e){ errMsg += (errMsg?' | ':'') + 'eval: ' + (e && e.message || e); }
+  }
+  if(typeof window.DiscordSDK !== 'function') throw new Error('โหลด Discord SDK ไม่สำเร็จ' + (errMsg ? ' (' + errMsg.slice(0,160) + ')' : ' (ไม่มี error — สคริปต์อาจถูกบล็อก)'));
 }
 // หา path ที่ใช้เรียก Worker ได้ใน Activity (/.proxy/api หรือ /api)
 async function dcProbeBase(){
