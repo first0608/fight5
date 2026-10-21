@@ -181,6 +181,29 @@
   .ccard.pickdisabled{ opacity:0.35; }
 
   #battleStage{ position:relative; overflow:hidden; }
+  /* 🗺️ แผนที่ */
+  .mhead{ display:flex; align-items:center; gap:8px; justify-content:space-between; margin-bottom:6px; }
+  .mgrid{ display:flex; flex-direction:column; align-items:center; gap:2px; margin:4px auto; user-select:none; }
+  .mgrid.busy{ opacity:.6; pointer-events:none; }
+  .mrow{ display:flex; gap:2px; }
+  .mcell{ border-radius:4px; display:flex; align-items:center; justify-content:center; line-height:1; box-shadow:inset 0 0 0 1px rgba(255,255,255,.06); }
+  .mcell.clr{ filter:brightness(.55); }
+  .mcell.city{ box-shadow:inset 0 0 0 2px #ffd54a; }
+  .mcell.me{ box-shadow:inset 0 0 0 2px #fff, 0 0 8px rgba(255,255,255,.6); }
+  .mcell.adj{ cursor:pointer; box-shadow:inset 0 0 0 1px rgba(255,255,255,.45); }
+  .mcell.adj:hover{ filter:brightness(1.35); }
+  .mpad{ display:flex; flex-direction:column; align-items:center; gap:4px; margin-top:6px; }
+  .mpad > div{ display:flex; align-items:center; }
+  .mpad button{ width:52px; height:40px; font-size:18px; padding:0; }
+  .mitems{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .mitems button{ flex:1 1 30%; font-size:12px; padding:8px 4px; }
+  .mhint{ padding:6px 10px; border-radius:8px; font-size:13px; margin:4px 0; font-weight:700; }
+  .mhint.howl{ background:rgba(200,40,40,.25); color:#ff9a9a; animation:mpulse 1.2s infinite; }
+  .mhint.car{ background:rgba(240,190,60,.2); color:#ffd77a; }
+  @keyframes mpulse{ 50%{ opacity:.55; } }
+  .mcitybox{ margin-top:8px; padding:8px 10px; border-radius:10px; background:rgba(255,213,74,.1); font-size:13px; }
+  .mmini{ display:flex; flex-direction:column; gap:0; align-items:center; }
+  .mmini .mrow{ gap:0; }
   #sceneImg{
     position:absolute; inset:0; background-size:cover; background-position:center;
     opacity:0.5; z-index:0;
@@ -498,6 +521,10 @@
     <!-- ⚔️ BATTLE -->
     <div class="screen" data-screen="battle">
 
+      <div class="panel" id="stageSelect">
+        <div class="vetBtnBox"></div>
+        <div id="mapRoot"></div>
+      </div>
       <div class="factionWheelBox" id="battleWheelBox"></div>
       <div class="panel" id="battleSetup">
         <h2>⚔️ เลือกทีม (สูงสุด 3 ตัว)</h2>
@@ -507,11 +534,6 @@
         <button class="primary" id="confirmTeamBtn" style="width:100%;margin-top:10px;display:none;" onclick="confirmTeam()">ยืนยันทีม (ล็อก 3 วัน)</button>
       </div>
 
-      <div class="panel" id="stageSelect">
-        <h2>🗺️ เลือกด่าน</h2>
-        <div id="stageGrid" class="cgrid" style="grid-template-columns:repeat(2,1fr);gap:10px;"></div>
-        <div class="vetBtnBox"></div>
-      </div>
       <div class="panel" id="pvpPanel" style="display:none;"></div>
 
       <div class="panel" id="battleStage" style="display:none;">
@@ -614,7 +636,7 @@
   <nav id="tabnav">
     <button data-nav="gacha" class="active" onclick="goTab('gacha')"><span class="ic">🥚</span><span class="lb">สุ่ม</span></button>
     <button data-nav="team" onclick="goTab('team')"><span class="ic">🛡️</span><span class="lb">ทีม</span></button>
-    <button data-nav="battle" data-tab="battle" class="fab" onclick="goTab('battle')"><span class="ic">⚔️</span><span class="lb">ต่อสู้</span></button>
+    <button data-nav="battle" data-tab="battle" class="fab" onclick="goTab('battle')"><span class="ic">🗺️</span><span class="lb">แผนที่</span></button>
     <button data-nav="compete" onclick="goTab(lastCompete)"><span class="ic">🏆</span><span class="lb">แข่งขัน</span></button>
     <button data-nav="more" onclick="openMoreSheet()"><span class="ic">☰</span><span class="lb">เมนู</span><span class="nbadge" id="moreBadge" style="display:none;">0</span></button>
   </nav>
@@ -872,6 +894,7 @@ async function onlineLogin(){
   renderAccountPanel();
   checkGifts(); onlineTick(); loadGameCfg();
   renderTopupPanel(); loadTopupInfo(true);
+  mapAfterLoad();
   if(code){
     document.getElementById('codeInput').value = code;
     await redeemCode();
@@ -940,6 +963,7 @@ function dcReadHash(){
 }
 async function dcAfterLogin(){
   await loadState(); renderAccountPanel(); checkGifts(); onlineTick(); loadGameCfg(); renderTopupPanel(); loadTopupInfo(true);
+  mapAfterLoad();
 }
 async function dcUseTicket(ticket){
   let r;
@@ -1420,15 +1444,28 @@ function renderGuide(){
     <b>ตู้เซฟ</b> เริ่ม ${STORAGE_CAP_BASE} ชนิด — <b>ปลอดภัย</b> ไม่มีวันหาย · ของดรอปเข้ากระเป๋าก่อน เต็มแล้วเข้าตู้เซฟ<br>
     ระหว่างต่อสู้ใช้ไอเทมและฝากของไม่ได้`));
 
-  secs.push(gSec('🗺️ ด่านและการต่อสู้', `
-    ${gTable(['ด่าน','เลเวลมอน','ศัตรู','⚡','เฟส','เหรียญ','EXP'], Object.entries(STAGES).map(([k,st])=>[st.name, stageLvText(k), st.isBoss?'บอส':st.grades.join('–'), st.staminaCost, st.phases, st.isBoss?'-':`${st.coinRange[0]}–${st.coinRange[1]}`, st.expReward]))}
+  secs.push(gSec('🗺️ แผนที่โลก (เดินทีละช่อง)', `
+    • แผนที่ ${MAP_W}×${MAP_H} ช่อง แบ่ง 4 โซน: ↖️ โรงพยาบาล · ↗️ ค่ายทหาร · ↙️ โรงเรียน · ↘️ ซากเมือง — แต่ละโซนมีเมือง 1 แห่ง (${Object.keys(MAP_CITY_INFO).map(k=>MAP_CITY_INFO[k].icon+' '+MAP_CITY_INFO[k].name).join(' · ')})<br>
+    • เดินบน/ล่าง/ซ้าย/ขวา ทีละ 1 ช่อง = ⚡1 และเจอศัตรู 1 ครั้งทุกช่อง · ช่องที่ชนะแล้วจะว่าง ${MAP_CLEAR_MS/60000} นาที · ยิ่งห่างเมืองศัตรูยิ่งเลเวล/เกรดสูง<br>
+    • โซนยากมอนสเตอร์ติด DNA และชิ้นส่วน: โรงเรียน DNA ${MAP_ENEMY_GEAR.school.dna*100}% · ค่ายทหาร ${MAP_ENEMY_GEAR.campground.dna*100}% (ชิ้นส่วน ${MAP_ENEMY_GEAR.campground.parts.join('–')}) · ซากเมือง ${MAP_ENEMY_GEAR.ruins.dna*100}% (ชิ้นส่วน ${MAP_ENEMY_GEAR.ruins.parts.join('–')})<br>
+    • 🏙️ <b>นอกเมืองใช้ได้แค่ของในกระเป๋า</b> (น้ำยา เสบียง เรดาห์ ยา) — ตลาด ร้านค้า ตู้เซฟ คลังเพชร กิล อารีน่า บอสโลก หอคอย ใช้ได้เฉพาะในเมือง · พกน้ำยาไปเยอะๆ<br>
+    • 📦 น้ำยาหมดกลางทาง: สั่งส่งด่วน ${MAP_DELIVERY_QTY} ขวด ราคา ${MAP_DELIVERY_COST.toLocaleString()}🪙 (เข้ากระเป๋าทันที)<br>
+    • 💀 แพ้ยกทีม = โทษการตาย + กลับไปเกิดที่เมืองล่าสุดที่เข้า<br>
+    • 👑 <b>บอสโซน</b> เกิดใหม่ทุก ${MAP_BOSS_MS/60000} นาที ตำแหน่งลับ — เดินเข้าใกล้ในระยะ 9×9 ช่องจะขึ้น "🔊 ได้ยินเสียงโหยหวน" · คนแรกที่ปราบได้รางวัลพิเศษ
+    ${gTable(['โซน','บอส','เลเวล/เกรด','EXP'], Object.keys(MAP_BOSS_INFO).map(k=>[MAP_ZONE_NAME[k], MAP_BOSS_INFO[k].name, `Lv.${MAP_BOSS_INFO[k].lv} · ${MAP_BOSS_INFO[k].grade}`, MAP_BOSS_INFO[k].exp]))}
+    • 🎖️ <b>ทหารผ่านศึกลึกลับ</b> โซนละ 1 คน ย้ายที่ทุก ${MAP_VET_MS/60000} นาที — เข้าใกล้ 9×9 ช่องจะขึ้น "🚚 ได้ยินเสียงรถ" · เดินไปเจอแล้วเปิดร้านได้<br>
+    • ⚔️ <b>PVP:</b> โซน${MAP_PVP_ZONES.map(z=>MAP_ZONE_NAME[z].replace('โซน','')).join('/')} (โรงพยาบาลปลอดภัย) — เดินไปช่องเดียวกับผู้เล่นที่อยู่นอกเมือง = สู้กันทันที (อีกฝ่ายออฟไลน์ก็โดนได้) · ผู้แพ้กลับเมือง<br>
+    • 📡 <b>เรดาห์</b> (ซื้อจากทหารผ่านศึก · ต้องอยู่ในกระเป๋า): ใช้ 1 อัน เห็นตำแหน่งผู้เล่นนอกเมืองในโซนนั้น ${MAP_RADAR_STEPS} ก้าว แล้วผลหายไป`));
+
+  secs.push(gSec('⚔️ การต่อสู้', `
+    ${gTable(['โซน','เลเวลมอน','เกรดศัตรู','เหรียญ','EXP'], Object.entries(STAGES).filter(([k,st])=>!st.isBoss).map(([k,st])=>[MAP_ZONE_NAME[k], stageLvText(k), st.grades.join('–'), `${st.coinRange[0]}–${st.coinRange[1]}`, st.expReward]))}
     • มอนสเตอร์มีเลเวลตามด่าน สเตตัสโตต่อเลเวล HP +${ENEMY_LV_GROWTH.hp*100}% · ATK +${ENEMY_LV_GROWTH.atk*100}% · DEF +${ENEMY_LV_GROWTH.def*100}% · SPD +${ENEMY_LV_GROWTH.spd*100}%<br>
     • ตัวละครเลเวลเกินมอนสูงสุดของด่านเกิน ${EXP_OVERLEVEL_FREE} เลเวล ได้ EXP ลดลง ${EXP_OVERLEVEL_STEP*100}% ต่อเลเวล (เหลืออย่างน้อย 10%)<br>
     • 👑 แพ็ค VIP (${VIP_PRICE}💎/${VIP_DAYS} วัน): ปุ่ม ⚡ จบทันที คำนวณการต่อสู้จนจบในครั้งเดียว<br>
-    • ทุกรอบเรียงลำดับตาม SPD สูงตีก่อน · ด่านหลายเฟส ต้องชนะครบทุกเฟสถึงได้รางวัล (เลือดต่อเนื่อง)<br>
+    • ทุกรอบเรียงลำดับตาม SPD สูงตีก่อน · เลือดต่อเนื่องจากไฟต์ก่อน (ไม่ฟื้นเอง ต้องใช้น้ำยา)<br>
     • คริติคอลสูงสุด 70% (เกินจะเพิ่มแรงคริแทน) · หลบสูงสุด 70% (เกินจะสวนกลับ) · DEF% สูงสุด 80% (เกินจะสะท้อนดาเมจ)<br>
     • พิษ: เสียเลือดตามเปอร์เซ็นต์ทุกเทิร์น และ ATK -10% ระหว่างติดพิษ<br>
-    • ด่านท่อน้ำ (บอส): ต้องใช้ 🎫 บัตรลงด่าน 1 ใบต่อครั้ง ซื้อที่ตลาดใบละ ${PIPE_MAP_COST}🪙 ซื้อได้ไม่จำกัด (แพ้ก็เสียบัตร)<br>
+    • ด่านท่อน้ำ (บอส): เข้าจากเมืองป้อมซากเมือง ต้องใช้ 🎫 บัตรลงด่าน 1 ใบต่อครั้ง ซื้อที่ตลาดใบละ ${PIPE_MAP_COST}🪙 ซื้อได้ไม่จำกัด (แพ้ก็เสียบัตร)<br>
     <b>ของดรอปเมื่อชนะ:</b> สุ่ม ${DROP_BASE_GROUPS} กลุ่ม — 🪙 โบนัสเหรียญ (บ่อยสุด ${DROP_GROUP_W[3]}%, มีโอกาส ${DROP_GROUP4_DIA_PCT}% เป็นเพชรแทน) · ไอเทม ${DROP_GROUP_W[0]}% · วัสดุ ${DROP_MAT_COUNT} ชิ้น ${DROP_GROUP_W[2]}% · ชิ้นส่วน ${DROP_GROUP_W[1]}%<br>
     • ลุ้นแยก: เพชรโบนัส · อุปกรณ์ (ปกติ ${DROP_EQUIP_CHANCE.normal}% · ซากเมือง ${DROP_EQUIP_CHANCE.ruins}% · ท่อน้ำ ${DROP_EQUIP_CHANCE.pipe}%) · ปูน/เหล็กเส้น · ทองแท่ง (ซากเมือง/ท่อน้ำ)`));
 
@@ -1441,11 +1478,11 @@ function renderGuide(){
     • แพ้ในสงครามกิล ไม่มีโทษการตาย<br>
     • ถ้าตายในโซนที่มีกิลครอง ของที่หายแต่ละชิ้นมีโอกาส ${DEATH_LOOT_TO_OWNER_CHANCE}% ไปอยู่ในคลังกิลผู้ครองพื้นที่นั้น`));
 
-  secs.push(gSec('📡 ดักผู้เล่น · ทหารผ่านศึก · ทองแท่ง', `
-    <b>🎖️ ทหารผ่านศึกลึกลับ:</b> สุ่มโผล่หลังชนะด่าน (โรงเรียน 1% · ค่ายทหาร 2% · ซากเมือง 3%) อยู่ 30 นาที — ปุ่มขึ้นในแท็บต่อสู้/ตลาด
-    ${gTable(['สินค้า','ราคา'],[['🧬 กล่องสุ่ม DNA เพชร',`📦 กล่องเก็บเงิน ${VET_DNA_COST_BOX} กล่อง (ต้องอยู่ในกระเป๋า) · สัปดาห์ละ 1 ครั้ง`],['📡 เรดาห์ โรงเรียน / ค่ายทหาร / ซากเมือง',`${Object.values(RADAR_PRICES).map(x=>x.toLocaleString()).join(' / ')}🪙 (ใช้ได้ ${RADAR_USES} ครั้ง แล้วหมดไป)`],['📦 บริการฝากเงินเข้ากล่อง','10,000🪙 → กล่องเก็บเงิน 1 กล่อง (เปิดได้ 5,000)'],['🥇 ทองแท่ง','📦 กล่องเก็บเงิน 5 กล่อง · วันละ 1 ครั้ง']])}
+  secs.push(gSec('📡 PVP · ทหารผ่านศึก · ทองแท่ง', `
+    <b>🎖️ ทหารผ่านศึกลึกลับ:</b> อยู่บนแผนที่โซนละ 1 คน (ย้ายที่ทุก 30 นาที) เข้าใกล้จะได้ยินเสียงรถ เดินไปเจอแล้วซื้อของได้<br>
+    ${gTable(['สินค้า','ราคา'],[['🧬 กล่องสุ่ม DNA เพชร',`📦 กล่องเก็บเงิน ${VET_DNA_COST_BOX} กล่อง (ต้องอยู่ในกระเป๋า) · สัปดาห์ละ 1 ครั้ง`],['📡 เรดาห์ โรงเรียน / ค่ายทหาร / ซากเมือง',`${Object.values(RADAR_PRICES).map(x=>x.toLocaleString()).join(' / ')}🪙 (ใช้ 1 อัน = เห็นผู้เล่นนอกเมืองในโซนนั้น ${MAP_RADAR_STEPS} ก้าว · ต้องอยู่ในกระเป๋า)`],['📦 บริการฝากเงินเข้ากล่อง','10,000🪙 → กล่องเก็บเงิน 1 กล่อง (เปิดได้ 5,000)'],['🥇 ทองแท่ง','📦 กล่องเก็บเงิน 5 กล่อง · วันละ 1 ครั้ง']])}
     <b>🥇 ทองแท่ง</b> ซื้อในร้านได้ ${GOLD_SHOP_PRICE}💎 (เดือนละ 1 ครั้ง) · ใช้แลกอาวุธ/ชุดเกราะพิเศษที่จะมาในอนาคต<br>
-    <b>📡 ดักผู้เล่น:</b> ใช้เรดาห์ของด่านนั้นสแกนหาผู้เล่นที่ลงฟาร์มด่านนั้นในช่วง 5 นาทีล่าสุด · ดักได้ทุกเลเวล · ทีมอีกฝ่ายสู้ด้วย AI (เลือดเริ่มอย่างน้อย 30%)<br>
+    <b>⚔️ PVP บนแผนที่:</b> เดินไปช่องเดียวกับผู้เล่นที่อยู่นอกเมือง (โซนโรงเรียน/ค่ายทหาร/ซากเมือง) = สู้กันทันที · ใช้เรดาห์หาตำแหน่งเป้าหมายได้<br>
     • ชนะ = ได้ของที่อีกฝ่ายตก 100% (กติกาเดียวกับโทษการตาย) + 1 คิลในลีดเดอร์บอร์ดการสังหาร · แพ้ = โดนโทษการตายเหมือนปกติ<br>
     • คนที่โดนดักได้โล่ 60 นาที · ถ้าป้องกันสำเร็จจะได้แจ้งเตือน<br>
     • 🟥 ตัวแดง: ดักเกิน ${PVP_RED_AFTER} ครั้ง/วัน → ถ้าแพ้ยกทีม โอกาสของตก x2 (รีเซ็ต 00:00 น.)<br>
@@ -1771,9 +1808,9 @@ const ITEM_DEFS = {
   dropmult_potion:  { name:'น้ำยาคูณดรอป',     icon:'✨' },
   money_box:        { name:'กล่องเก็บเงิน',     icon:'📦' },
   gold_bar:         { name:'ทองแท่ง',           icon:'🥇' },
-  radar_school:     { name:'เรดาห์ตรวจจับด่านโรงเรียน', icon:'📡' },
-  radar_campground: { name:'เรดาห์ตรวจจับด่านค่ายทหาร', icon:'📡' },
-  radar_ruins:      { name:'เรดาห์ตรวจจับด่านซากเมือง', icon:'📡' },
+  radar_school:     { name:'เรดาห์โซนโรงเรียน', icon:'📡' },
+  radar_campground: { name:'เรดาห์โซนค่ายทหาร', icon:'📡' },
+  radar_ruins:      { name:'เรดาห์โซนซากเมือง', icon:'📡' },
   cement:           { name:'ปูน',               icon:'🧱' },
   rebar:            { name:'เหล็กเส้น',          icon:'🔩' },
   blueprint_ticket: { name:'ใบสุ่มแปลนคราฟอุปกรณ์', icon:'📜' },
@@ -2420,7 +2457,7 @@ function renderRoster(){
     el.addEventListener('click', ()=> openDetail(el.dataset.id));
   });
 }
-function renderAll(){ renderHud(); renderRoster(); renderBag(); renderDNATab(); renderShop(); renderGuildTab(); renderVault(); renderVipPanel(); renderPvpPanel(); if(document.querySelector('.screen.active[data-screen="quest"]')) renderQuestTab(); renderGoldShopNote(); renderVeteranButtons(); if(document.getElementById('p2pMarket') && mkt.list) renderP2PMarket(); }
+function renderAll(){ renderHud(); renderRoster(); renderBag(); renderDNATab(); renderShop(); renderGuildTab(); renderVault(); renderVipPanel(); renderPvpPanel(); if(document.querySelector('.screen.active[data-screen="quest"]')) renderQuestTab(); renderGoldShopNote(); renderVeteranButtons(); if(typeof renderMapPanel==='function' && document.querySelector('.screen.active[data-screen="battle"]') && !battleActive) renderMapPanel(); if(document.getElementById('p2pMarket') && mkt.list) renderP2PMarket(); }
 
 function dnaPkgCardHtml(pkg){
   return `<div class="part-pick-item">
@@ -2722,6 +2759,7 @@ function gearCardHtml(g){
 }
 // เช็ค/หักไอเทม 1 ชิ้น จากกระเป๋าก่อน แล้วค่อยจากคลัง — คืน true ถ้าหักสำเร็จ
 async function consumeItem(itemId){
+  if(typeof inTown==='function' && profile && !inTown() && !(bagItems[itemId] > 0)) return false;   // นอกเมือง: ใช้ได้เฉพาะของในกระเป๋า
   if(bagItems[itemId] > 0){
     bagItems[itemId]--;
     if(bagItems[itemId]<=0) delete bagItems[itemId];
@@ -2744,7 +2782,7 @@ function openHealPicker(){
   if(battleActive){ showToast('ใช้ของระหว่างต่อสู้ไม่ได้'); return; }
   const html = `
     <div class="panel">
-      <h2>🧪 ใช้น้ำยาเพิ่มเลือด (มี ${totalItemQty('heal_potion')} ขวด)</h2>
+      <h2>🧪 ใช้น้ำยาเพิ่มเลือด (มี ${usableQty('heal_potion')} ขวด${inTown()?'':' ในกระเป๋า'})</h2>
       <div class="note">ฟื้นเลือด ${HEAL_POTION_PCT}% ของเลือดสูงสุด 1 ตัว — เลือดจะไม่ฟื้นเองหลังจบไฟต์ ถ้าไม่ใช้ยาจะเหลือเลือดเท่าที่สู้จบครั้งก่อน</div>
       ${roster.map(ch=>{
         const pct = Math.round((ch.currentHp!=null?ch.currentHp:ch.stats.hp)/ch.stats.hp*100);
@@ -2764,7 +2802,7 @@ async function useHealPotion(charId){
   if(battleActive){ showToast('ใช้ของระหว่างต่อสู้ไม่ได้'); return; }
   const ch = roster.find(r=>r.id===charId);
   if(!ch) return;
-  if(totalItemQty('heal_potion')<=0){ showToast('ไม่มีน้ำยาเพิ่มเลือด'); return; }
+  if(usableQty('heal_potion')<=0){ showToast(inTown()?'ไม่มีน้ำยาเพิ่มเลือด':'ไม่มีน้ำยาในกระเป๋า — กด 📦 สั่งน้ำยาส่งด่วนได้'); return; }
   const ok = await consumeItem('heal_potion');
   if(!ok) return;
   const healAmt = Math.round(ch.stats.hp*HEAL_POTION_PCT/100);
@@ -2776,7 +2814,7 @@ async function useHealPotion(charId){
 }
 async function useSupplies(){
   if(battleActive){ showToast('ใช้ของระหว่างต่อสู้ไม่ได้'); return; }
-  if(totalItemQty('oil')<=0){ showToast('ไม่มีเสบียง'); return; }
+  if(usableQty('oil')<=0){ showToast(inTown()?'ไม่มีเสบียง':'ไม่มีเสบียงในกระเป๋า'); return; }
   const ok = await consumeItem('oil');
   if(!ok) return;
   profile.stamina += 5;   // ใช้เกินแม็กซ์ได้
@@ -3345,19 +3383,24 @@ function inflictPoison(unit, turns, dmgPct){
   }
 }
 
-function startBattle(diff){
+function startBattle(diff, opts){
+  const isMap = !!(opts && opts.map);
   if(battleActive){ showToast('กำลังสู้อยู่ ปิดไฟต์นี้ก่อนถึงเริ่มใหม่ได้'); return; }
   if(!profile.lockedTeamIds){ showToast('ต้องเลือกทีมแล้วกดยืนยันก่อนถึงจะสู้ได้'); return; }
-  if(STAGES[diff].isBoss){
+  if(!isMap && !STAGES[diff].isBoss){ showToast('🗺️ ออกเดินทางบนแผนที่เพื่อต่อสู้'); goTab('battle'); return; }
+  if(!isMap){
     if(!(profile.pipeTickets>0)){ showToast(`ต้องมีบัตรลงด่าน — ซื้อได้ที่ตลาด ใบละ ${PIPE_MAP_COST}🪙`); return; }
+    if(!inTown() || mapPos().z!=='ruins'){ showToast('🕳️ ด่านท่อน้ำเข้าได้จากเมืองป้อมซากเมืองเท่านั้น'); return; }
+    if(profile.stamina < STAGES[diff].staminaCost){ showToast('พลังฟาร์มไม่พอ'); return; }
   }
-  if(profile.stamina < STAGES[diff].staminaCost){ showToast('พลังฟาร์มไม่พอ'); return; }
   battleActive = true;                 // ล็อกทันทีกันสแปมกดซ้ำ ก่อนจะไปทำงานอย่างอื่นต่อ
-  profile.stamina -= STAGES[diff].staminaCost;
-  if(STAGES[diff].isBoss) profile.pipeTickets--;   // ใช้บัตร 1 ใบต่อการลง 1 ครั้ง (แพ้/ชนะก็ใช้บัตร)
-  if(PVP_STAGES.includes(diff)) profile.lastFarm = { stage:diff, ts:Date.now() };
-  questAdd('stamina', STAGES[diff].staminaCost);
-  if(diff==='pipe') questAdd('pipe', 1);
+  mapBattle = isMap ? opts.map : null;
+  if(!isMap){
+    profile.stamina -= STAGES[diff].staminaCost;
+    profile.pipeTickets--;   // ใช้บัตร 1 ใบต่อการลง 1 ครั้ง (แพ้/ชนะก็ใช้บัตร)
+    questAdd('stamina', STAGES[diff].staminaCost);
+    questAdd('pipe', 1);
+  }
   saveProfile(); renderHud();
   currentDiff = diff;
   warBattle = null;
@@ -3367,7 +3410,7 @@ function startBattle(diff){
   const myChars = profile.lockedTeamIds.map(id => roster.find(r=>r.id===id)).filter(Boolean);
   // DNA "ระบบป้องกันเต็มรูปแบบ": ตัวที่มีจะถูกบังคับไปยืนแนวหน้าเสมอ (ล็อกแนวหน้า)
   myChars.sort((a,b)=> getDNACount(b,'fulldef') - getDNACount(a,'fulldef'));
-  const enemyChars = makeEnemyTeam(diff);
+  const enemyChars = isMap ? opts.enemies : makeEnemyTeam(diff);
 
   // โบนัสชุดครบซอมบี้ "อัญเชิญลูกน้อง": อัญเชิญลูกน้องมายืนแนวหน้าเพิ่ม (พลัง 40% ของเจ้าของ)
   const meUnits = [];
@@ -3390,7 +3433,11 @@ function startBattle(diff){
   document.getElementById('battleStage').style.display='block';
   document.getElementById('sceneImg').style.backgroundImage = `url(${SCENES[STAGES[diff].scene]})`;
   document.getElementById('battleLog').innerHTML='';
-  logLine('sys', `เริ่มต่อสู้ที่ ${STAGES[diff].name}! ${STAGES[diff].phases>1?`(ทั้งหมด ${STAGES[diff].phases} เฟส)`:''}`);
+  if(isMap){
+    const pp = mapPos();
+    if(opts.map.boss) logLine('sys', `👑 เจอบอสโซน "${MAP_BOSS_INFO[diff].name}" ที่ (${pp.x},${pp.y})! ปราบได้รับรางวัลพิเศษ`);
+    else logLine('sys', `⚔️ เจอศัตรูที่${MAP_ZONE_NAME[diff]} (${pp.x},${pp.y})${enemyChars.some(c=>c.dna&&c.dna.length)?' — บางตัวติด DNA!':''}`);
+  } else logLine('sys', `เริ่มต่อสู้ที่ ${STAGES[diff].name}! ${STAGES[diff].phases>1?`(ทั้งหมด ${STAGES[diff].phases} เฟส)`:''}`);
   if(battleGuildBonus) logLine('sys', `🏰 สู้ในเขตกิลเรา: ATK +${battleGuildBonus.atk} · หลบ +${battleGuildBonus.eva}% · DEF +${battleGuildBonus.def}`);
   if(battleTaxOwner) logLine('sys', `🏰 โซนนี้ถูกครองโดยกิล "${esc(battleTaxOwner.gname)}" — ของที่ได้ต้องเสียภาษี (เพชร ${TAX_DIAMOND_PCT}% · เหรียญ ${TAX_COIN_PCT}% · อุปกรณ์ ${TAX_GEAR_CHANCE}%)`);
   renderBattle();
@@ -3637,7 +3684,7 @@ function checkBattleOutcome(){
   if(warBattle){ endWarBattle(result); return; }   // สงครามกิล: จบแล้วนับดาเมจ ไม่มีเฟส/ของดรอปปกติ
   if(result==='win'){
     const stage = STAGES[currentDiff];
-    const totalPhases = stage.phases || 1;
+    const totalPhases = mapBattle ? 1 : (stage.phases || 1);
     if(currentPhase < totalPhases){
       currentPhase++;
       logLine('sys', `⚔️ ผ่านเฟส ${currentPhase-1}/${totalPhases}! ศัตรูระลอกใหม่มาแล้ว (เฟส ${currentPhase}/${totalPhases})`);
@@ -3778,8 +3825,9 @@ async function endBattle(result){
   battleUnits.filter(u=>u.side==='me' && !u.isMinion).forEach(u=>{ u.char.currentHp = u.curHp; });
   await saveRoster();
 
+  const mb = mapBattle;
   if(result==='win'){
-    const stage = STAGES[currentDiff];
+    const stage = (mb && mb.boss) ? { ...STAGES[currentDiff], expReward: MAP_BOSS_INFO[currentDiff].exp, dropMult: 2, coinRange:[300,800] } : STAGES[currentDiff];
     const taxOwner = battleTaxOwner;
     const coinsBeforeReward = profile.coins, diaBeforeReward = profile.diamonds;
     let taxedGear = null;
@@ -3905,7 +3953,8 @@ async function endBattle(result){
     // กลุ่มที่ 5: อุปกรณ์สวมใส่ — โอกาสแยกต่างหาก ไม่ผูกกับการสุ่มกลุ่มด้านบน
     // ปกติ 1% / ด่านซากเมือง 5% / ด่านท่อน้ำ 40%
     let equipDropChance = DROP_EQUIP_CHANCE.normal;
-    if(currentDiff==='pipe') equipDropChance = DROP_EQUIP_CHANCE.pipe;
+    if(currentDiff==='pipe' || (mb && mb.boss && currentDiff==='ruins')) equipDropChance = DROP_EQUIP_CHANCE.pipe;
+    else if(mb && mb.boss) equipDropChance = DROP_EQUIP_CHANCE.ruins * 2;
     else if(currentDiff==='ruins') equipDropChance = DROP_EQUIP_CHANCE.ruins;
     equipDropChance *= 1 + sqBonusPct()/100;
     if(Math.random()*100 < equipDropChance){
@@ -3927,7 +3976,19 @@ async function endBattle(result){
     dropLines.forEach(l => logLine('sys', l));
     lbRecordWin(currentDiff);
     questBattleResult(true, battleUnits.filter(u=>u.side==='me' && !u.isMinion).every(u=>u.curHp>0));
-    if(maybeSpawnVeteran(currentDiff)) questAdd('vet', 1);
+    if(!mb && maybeSpawnVeteran(currentDiff)) questAdd('vet', 1);
+    if(mb){
+      const pp = mapPos(); mapMarkCleared(pp.x, pp.y);
+      if(mb.boss){
+        if(isOnlineMode() && ON.token){
+          try{
+            const br = await onlineRpc({ a:'mapBossWin', t:ON.token, w:mb.w });
+            if(br && br.ok){ profile.diamonds += br.dia||0; profile.coins += br.coin||0; logLine('sys', `👑 ปราบบอสโซนสำเร็จ! รางวัลพิเศษ 💎 ${br.dia} · 🪙 ${(br.coin||0).toLocaleString()}`); }
+            else logLine('sys', `👑 ${esc((br&&br.error)||'ส่งผลบอสไม่สำเร็จ')}`);
+          }catch(e){ logLine('sys', '⚠️ ส่งผลบอสไปเซิร์ฟเวอร์ไม่สำเร็จ'); }
+        } else { (profile.mapBossDead = profile.mapBossDead||{})[currentDiff+':'+mb.w] = Date.now(); logLine('sys', '👑 ปราบบอสโซนสำเร็จ!'); }
+      }
+    }
     await saveProfile();
     await saveBagItems();
     await saveWarehouseItems();
@@ -3936,6 +3997,7 @@ async function endBattle(result){
     logLine('sys', `💀 แพ้ยกทีม — ไม่ได้อะไรเลย`);
     questBattleResult(false);
     await applyDeathPenalty();
+    if(mb) await mapRespawn();
   } else {
     logLine('sys', `⚖️ เสมอ`);
   }
@@ -4139,7 +4201,8 @@ function closeBattle(){
   if(modeBattle && !modeBattle.done) endModeBattle('quit');      // ออกกลางไฟต์อารีน่า/บอสโลก/หอคอย
   modeBattle = null;
   const nb = document.getElementById('btnModeNext'); if(nb) nb.style.display='none';
-  warBattle = null; pvpBattle = null;
+  const wasPvpMap = pvpBattle && pvpBattle.map;
+  warBattle = null; pvpBattle = null; mapBattle = null;
   battleActive=false; battleOver=false;
   if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
   autoOn=false;
@@ -4153,8 +4216,9 @@ function closeBattle(){
   renderPvpPanel();
   pickedIds = [];
   renderPickGrid();
-  renderStageGrid();
+  renderMapPanel();
   renderGuildTab();
+  if(wasPvpMap) mapSync();
   if(backTab) goTab(backTab); else renderSubnav();
 }
 
@@ -5284,7 +5348,7 @@ function renderTeamHp(){
     </div>`;
   }).join('');
   el.style.display='flex';
-  el.innerHTML = rows + `<div class="thp-heal" title="ใช้น้ำยาเพิ่มเลือด">🧪<span>${totalItemQty('heal_potion')}</span></div>`;
+  el.innerHTML = rows + `<div class="thp-heal" title="ใช้น้ำยาเพิ่มเลือด">🧪<span>${(typeof usableQty==='function'?usableQty('heal_potion'):totalItemQty('heal_potion'))}</span></div>`;
 }
 
 // =====================================================================
@@ -5853,7 +5917,7 @@ function openVeteranShop(){
     <h2>🎖️ ทหารผ่านศึกลึกลับ</h2>
     <div class="note">"ข้ามีของดีที่หาที่ไหนไม่ได้... แต่ข้ารับแต่กล่องเก็บเงินที่พกติดตัวเท่านั้น" · กล่องเก็บเงินในกระเป๋า: <b>${box}</b> กล่อง</div>
     ${row('🧬 กล่องสุ่ม DNA (เพชร)', `ราคา ${VET_DNA_COST_BOX} กล่องเก็บเงิน (ต้องอยู่ในกระเป๋า) · จำกัดสัปดาห์ละ 1 ครั้ง (รีเซ็ตวันจันทร์)${profile.vetDnaWeek===thWeekKey()?' (สัปดาห์นี้แลกแล้ว)':''}`, `<button class="primary" onclick="vetBuyDnaBox()" ${(box<VET_DNA_COST_BOX||profile.vetDnaWeek===thWeekKey())?'disabled':''}>แลก</button>`)}
-    ${Object.keys(RADAR_PRICES).map(st=>row(`📡 เรดาห์ตรวจจับ${STAGES[st].name}`, `${RADAR_PRICES[st].toLocaleString()}🪙 · ใช้ได้ ${RADAR_USES} ครั้ง · ค้นหาและดักผู้เล่นในด่านนี้`, `<button class="primary" onclick="vetBuyRadar('${st}')" ${profile.coins<RADAR_PRICES[st]?'disabled':''}>ซื้อ</button>`)).join('')}
+    ${Object.keys(RADAR_PRICES).map(st=>row(`📡 เรดาห์${MAP_ZONE_NAME[st]}`, `${RADAR_PRICES[st].toLocaleString()}🪙 · ใช้ 1 อัน = เห็นตำแหน่งผู้เล่นนอกเมืองใน${MAP_ZONE_NAME[st]} ${MAP_RADAR_STEPS} ก้าว (ต้องอยู่ในกระเป๋า)`, `<button class="primary" onclick="vetBuyRadar('${st}')" ${profile.coins<RADAR_PRICES[st]?'disabled':''}>ซื้อ</button>`)).join('')}
     ${row('📦 ฝากเงินเข้ากล่องเก็บเงิน', `จ่าย ${VET_MONEYBOX_SERVICE.toLocaleString()}🪙 ได้กล่องเก็บเงิน 1 กล่อง (เปิดได้ ${MONEY_BOX_COINS.toLocaleString()}🪙)`, `<button class="primary" onclick="vetMoneyBoxService()" ${profile.coins<VET_MONEYBOX_SERVICE?'disabled':''}>ฝาก</button>`)}
     ${row('💰 ขายทองแท่ง', `รับซื้อแท่งละ 💎 ${cfgSet('vet_gold_sell').toLocaleString()} (ทองแท่งต้องอยู่ในกระเป๋า · มี ${bagQty('gold_bar')} แท่ง)`, `<button class="diamond" onclick="vetSellGold()" ${bagQty('gold_bar')<1?'disabled':''}>ขาย</button>`)}
     ${['cement','rebar'].map(it=>row(`${ITEM_DEFS[it].icon} ส่ง${ITEM_DEFS[it].name} (เควส)`, `มี ${totalItemQty(it)} หน่วย · นับเควสรายเดือน + เควสเซิร์ฟเวอร์`, `<span style="display:flex;gap:4px;"><input type="number" id="vetDon_${it}" min="1" max="${totalItemQty(it)}" value="${totalItemQty(it)}" style="width:64px;"><button class="primary" onclick="vetDonate('${it}')" ${totalItemQty(it)<1?'disabled':''}>ส่ง</button></span>`)).join('')}
@@ -5880,7 +5944,7 @@ async function vetBuyRadar(st){
   if(!loc){ showToast('กระเป๋า+ตู้เซฟเต็ม'); return; }
   profile.coins -= RADAR_PRICES[st];
   await saveProfile(); await saveBagItems(); await saveWarehouseItems(); renderAll(); openVeteranShop();
-  showToast(`📡 ได้เรดาห์${STAGES[st].name} (${RADAR_USES} ครั้ง)`);
+  showToast(`📡 ได้เรดาห์${MAP_ZONE_NAME[st]}`);
 }
 async function vetMoneyBoxService(){
   if(!veteranActive()) return;
@@ -6049,8 +6113,7 @@ function applyPvpLoss(loot){
 function radarUses(st){ return totalItemQty('radar_'+st); }
 function renderPvpPanel(){
   const el = document.getElementById('pvpPanel'); if(!el || !profile) return;
-  if(!isOnlineMode() || !ON.token || battleActive){ el.style.display='none'; return; }
-  el.style.display='block';
+  el.style.display='none'; return;   // ระบบดักแบบเดิมถูกแทนด้วย PVP บนแผนที่
   const cnt = pvpTodayCount();
   const shield = (profile.pvpShieldUntil||0) > Date.now() ? `🛡️ โล่กันโดนดักเหลือ ${Math.ceil((profile.pvpShieldUntil-Date.now())/60000)} นาที` : '';
   const radars = PVP_STAGES.map(st=>`<button class="${radarUses(st)?'primary':'ghost'}" style="flex:1 1 30%;" onclick="pvpScan('${st}')" ${radarUses(st)?'':'disabled'}>📡 ${STAGES[st].name.replace('ด่าน','')}<br><span class="note" style="margin:0;">เหลือ ${radarUses(st)} ครั้ง</span></button>`).join('');
@@ -6141,8 +6204,9 @@ async function endPvpBattle(result){
     loot.items.forEach(x=> logLine('sys', `🎁 ได้ ${pvpLootLabel(x)}`));
     await saveProfile(); await saveBagItems(); await saveWarehouseItems(); await saveParts(); await saveEquipment(); await saveDNAPackages();
   } else if(result==='lose'){
-    logLine('sys', `💀 ดักไม่สำเร็จ — ทีมเราแพ้ยกทีม`);
+    logLine('sys', `💀 ${pb.map?'แพ้การต่อสู้':'ดักไม่สำเร็จ'} — ทีมเราแพ้ยกทีม`);
     await applyDeathPenalty();
+    if(pb.map){ const p0 = mapPos(); const lc = MAP_CITIES[p0.lc] ? p0.lc : 'hospital'; profile.mapPos = { x:MAP_CITIES[lc].x, y:MAP_CITIES[lc].y, z:lc, city:true, lc }; profile.mapRadar = null; await saveProfile(); logLine('sys', `🏥 ฟื้นคืนชีพที่${MAP_CITY_INFO[lc].name}`); }
   } else logLine('sys', '⚖️ เสมอ');
   try{
     const rr = await onlineRpc({ a:'pvpResult', t:ON.token, attackId:pb.attackId, win: result==='win', loot });
@@ -6405,6 +6469,7 @@ let curTab = 'gacha', lastCompete = 'arena';
 function goTab(tab){
   if(battleActive && tab!=='battle'){ showToast('⚔️ ระหว่างต่อสู้ใช้เมนูอื่นไม่ได้ — ปิดไฟต์ก่อน'); return; }
   if(!document.querySelector(`.screen[data-screen="${tab}"]`)) return;
+  if(typeof inTown==='function' && profile && !inTown() && !MAP_OUT_TABS.includes(tab)){ closeMoreSheet(); showToast('🏙️ อยู่นอกเมือง — เมนูนี้ใช้ได้เฉพาะในเมือง (เดินกลับเมืองก่อน)'); return; }
   closeMoreSheet();
   const changed = curTab !== tab;
   curTab = tab;
@@ -6414,7 +6479,7 @@ function goTab(tab){
   document.querySelectorAll('#tabnav button[data-nav]').forEach(b=> b.classList.toggle('active', b.dataset.nav===group));
   renderSubnav();
   if(changed){ const c = document.getElementById('content'); if(c) c.scrollTop = 0; }
-  if(tab==='battle' && !battleActive){ renderPickGrid(); renderStageGrid(); renderPvpPanel(); }
+  if(tab==='battle' && !battleActive){ renderPickGrid(); renderMapPanel(); }
   if(tab==='guild'){ renderGuildTab(); refreshGuildData(); }
   if(tab==='market'){ renderTopupPanel(); loadTopupInfo(); mktLoad(); }
   if(tab==='rank'){ lbLoad(); }
@@ -6936,12 +7001,321 @@ setTimeout(()=>{ chatPoll(); scheduleChat(); }, 4000);
 // บั๊คเดิม: ฟังก์ชันพวกนี้เป็น async และมี await saveXxx() อยู่กลางทาง ถ้ากดปุ่มรัวๆ
 // เทิร์นที่สองจะเรียกฟังก์ชันซ้ำได้ตั้งแต่ก่อนรอบแรกบันทึกเสร็จ ทำให้ได้ของ/ใช้ของซ้ำ
 let __actionBusy = false;
+// =====================================================================
+// 🗺️ แผนที่โลก — เดินทีละช่อง (1 ช่อง = 1 สเตมิน่า = 1 ไฟต์) · 4 โซน · เมืองโซนละ 1 แห่ง
+//  ซ้ายบน=โรงพยาบาล · ขวาบน=ค่ายทหาร · ซ้ายล่าง=โรงเรียน · ขวาล่าง=ซากเมือง
+//  นอกเมือง: ใช้ได้แค่ของในกระเป๋า (น้ำยา/เสบียง/เรดาห์) · ตาย = กลับไปเกิดที่เมืองล่าสุด
+// =====================================================================
+const MAP_W = 40, MAP_H = 40, MAP_HALF = 20, MAP_VIEW = 11;
+const MAP_CLEAR_MS = 5*60000;        // ช่องที่เคลียร์แล้วจะว่าง 5 นาที
+const MAP_RADAR_STEPS = 5;           // เรดาห์ 1 อัน = เห็นผู้เล่นในโซน 5 ก้าว
+const MAP_DELIVERY_COST = 2000, MAP_DELIVERY_QTY = 5;   // สั่งน้ำยาส่งด่วนนอกเมือง
+const MAP_HINT_R = 4;                // รัศมี 9×9
+const MAP_BOSS_MS = 30*60000, MAP_VET_MS = 30*60000;
+const MAP_PVP_ZONES = ['school','campground','ruins'];
+const MAP_CITIES = { hospital:{x:10,y:13}, campground:{x:36,y:3}, school:{x:3,y:30}, ruins:{x:36,y:36} };
+const MAP_CITY_INFO = { hospital:{name:'นิคมโรงพยาบาล',icon:'🏥'}, school:{name:'ชุมชนโรงเรียน',icon:'🏫'}, campground:{name:'ฐานทัพค่ายทหาร',icon:'🪖'}, ruins:{name:'ป้อมซากเมือง',icon:'🏚️'} };
+const MAP_ZONE_NAME = { hospital:'โซนโรงพยาบาล', school:'โซนโรงเรียน', campground:'โซนค่ายทหาร', ruins:'โซนซากเมือง' };
+const MAP_ZONE_COLOR = { hospital:'#24452c', school:'#22364f', campground:'#4d4420', ruins:'#4f2222' };
+const MAP_BOSS_INFO = {
+  hospital:   { name:'หมอคลั่งกลายพันธุ์', faction:'human',   grade:'A',   lv:8,  exp:150,  hp:5, atk:1.5 },
+  school:     { name:'ครูใหญ่ซอมบี้',     faction:'zombie',  grade:'S',   lv:13, exp:400,  hp:5, atk:1.5 },
+  campground: { name:'ผู้พันกลายพันธุ์',   faction:'machine', grade:'SS',  lv:19, exp:900,  hp:5, atk:1.6 },
+  ruins:      { name:'ซอมบี้ต้นแบบ',      faction:'zombie',  grade:'SSS', lv:25, exp:2000, hp:6, atk:1.7 },
+};
+// มอนสเตอร์โซนยาก: ติด DNA + ชิ้นส่วน (เพิ่มสเตตัสตาม % ของเกรด)
+const MAP_ENEMY_GEAR = { hospital:{dna:0, parts:[0,0]}, school:{dna:0.25, parts:[0,1]}, campground:{dna:0.6, parts:[1,3]}, ruins:{dna:1, parts:[2,5]} };
+
+let mapBattle = null;     // ไฟต์บนแผนที่ที่กำลังสู้ {cell, zone, boss, w}
+let mapHints = { howl:false, car:false };
+let mapBusy = false, mapShowMini = false;
+
+function mapZoneOf(x,y){ return y<MAP_HALF ? (x<MAP_HALF?'hospital':'campground') : (x<MAP_HALF?'school':'ruins'); }
+function mapIsCity(x,y){ const c = MAP_CITIES[mapZoneOf(x,y)]; return c.x===x && c.y===y; }
+function mapPos(){
+  if(!profile) return { x:MAP_CITIES.hospital.x, y:MAP_CITIES.hospital.y, z:'hospital', city:true, lc:'hospital' };
+  if(!profile.mapPos) profile.mapPos = { x:MAP_CITIES.hospital.x, y:MAP_CITIES.hospital.y, z:'hospital', city:true, lc:'hospital' };
+  return profile.mapPos;
+}
+function inTown(){ return !!mapPos().city; }
+function bagOnlyQty(id){ return bagItems[id]||0; }
+function usableQty(id){ return inTown() ? totalItemQty(id) : bagOnlyQty(id); }
+function mapCellKey(x,y){ return x+','+y; }
+function mapCleared(x,y){ const t = (profile.mapCleared||{})[mapCellKey(x,y)]; return t && Date.now()-t < MAP_CLEAR_MS; }
+function mapMarkCleared(x,y){
+  const m = profile.mapCleared = profile.mapCleared || {};
+  const now = Date.now();
+  Object.keys(m).forEach(k=>{ if(now-m[k] >= MAP_CLEAR_MS) delete m[k]; });
+  m[mapCellKey(x,y)] = now;
+}
+function mapTeamAlive(){
+  const t = (profile.lockedTeamIds||[]).map(id=>roster.find(r=>r.id===id)).filter(Boolean);
+  return t.some(c=>(c.currentHp!=null?c.currentHp:c.stats.hp)>0);
+}
+
+// ---------- ศัตรูบนแผนที่: ยิ่งห่างเมืองยิ่งเก่ง ----------
+function mapDecorateEnemy(c, zone){
+  const g = MAP_ENEMY_GEAR[zone] || MAP_ENEMY_GEAR.hospital;
+  if(g.dna>0 && Math.random()<g.dna && DNA_SLOT_CONFIG[c.grade]){
+    c.dnaGrade = c.grade;
+    c.dna = DNA_SLOT_CONFIG[c.grade].map(()=> rollRandomDNA(Math.random()<0.6 ? c.faction : randomFaction()));
+  }
+  const n = g.parts[0] + Math.floor(Math.random()*(g.parts[1]-g.parts[0]+1));
+  if(n>0){
+    const pct = n * (GRADES[c.grade] ? GRADES[c.grade].partPct : 1);
+    ['hp','atk','defFlat'].forEach(k=> c.stats[k] = Math.round(c.stats[k]*(1+pct/100)));
+    c.partsN = n;
+  }
+  return c;
+}
+function mapEnemyTeam(zone, x, y){
+  const c = MAP_CITIES[zone];
+  const t = Math.min(1, Math.max(Math.abs(x-c.x), Math.abs(y-c.y)) / 16);   // 0 = ติดเมือง · 1 = ไกลสุด
+  const [lo,hi] = STAGE_LEVELS[zone];
+  const pool = STAGES[zone].grades;
+  const team = [];
+  const n = t < 0.25 ? 2 : 3;
+  for(let i=0;i<n;i++){
+    const lv = Math.max(lo, Math.min(hi, Math.round(lo + (hi-lo)*t + (Math.random()*2-1))));
+    const gi = Math.min(pool.length-1, Math.floor(Math.random()*(1+t*(pool.length-1)+0.3)));
+    team.push(mapDecorateEnemy(makeEnemyChar(randomFaction(), pool[gi], lv), zone));
+  }
+  return team;
+}
+function mapBossTeam(zone){
+  const b = MAP_BOSS_INFO[zone];
+  const boss = makeEnemyChar(b.faction, b.grade, b.lv);
+  boss.name = '👑 ' + b.name;
+  boss.stats.hp = Math.round(boss.stats.hp*b.hp); boss.stats.atk = Math.round(boss.stats.atk*b.atk); boss.stats.defFlat = Math.round(boss.stats.defFlat*1.3);
+  boss.dnaGrade = b.grade; boss.dna = DNA_SLOT_CONFIG[b.grade].map(()=> rollRandomDNA(b.faction));
+  boss.isMapBoss = true;
+  const c = MAP_CITIES[zone];
+  const escorts = mapEnemyTeam(zone, c.x+16, c.y+16).slice(0,2);
+  return [boss, ...escorts];
+}
+
+// ---------- โหมดออฟไลน์ (ไม่มีเซิร์ฟเวอร์): จำลองบอส/ทหารผ่านศึกในเครื่อง ----------
+function mapLocalCell(kind, zone, w){
+  let h = 2166136261; const s = (profile.playerId||'local')+':'+kind+':'+zone+':'+w;
+  for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619)>>>0; }
+  const ox = (zone==='hospital'||zone==='school') ? 0 : MAP_HALF, oy = (zone==='hospital'||zone==='campground') ? 0 : MAP_HALF;
+  const c = MAP_CITIES[zone];
+  for(let i=0;i<10;i++){ h = Math.imul(h ^ (h>>>13), 1274126177)>>>0; const x = ox + h%MAP_HALF, y = oy + (h>>>8)%MAP_HALF; if(Math.max(Math.abs(x-c.x),Math.abs(y-c.y))>=4) return {x,y}; }
+  return { x:ox+5, y:oy+5 };
+}
+function mapLocalMove(x,y){
+  const p = mapPos();
+  if(Math.abs(x-p.x)+Math.abs(y-p.y)!==1) return { ok:false, error:'เดินได้ทีละ 1 ช่อง', pos:p };
+  const z = mapZoneOf(x,y), city = mapIsCity(x,y), now = Date.now();
+  const pos = { x, y, z, city, lc: city ? z : (p.lc||'hospital') };
+  let enc = city ? { type:'city', zone:z } : null;
+  const w = Math.floor(now/MAP_BOSS_MS);
+  const b = mapLocalCell('boss', z, w), v = mapLocalCell('vet', z, Math.floor(now/MAP_VET_MS));
+  const bossDead = (profile.mapBossDead||{})[z+':'+w];
+  if(!enc && !bossDead && b.x===x && b.y===y) enc = { type:'boss', zone:z, w, reward:{dia:0,coin:0} };
+  if(!enc && v.x===x && v.y===y) enc = { type:'vet', zone:z };
+  const near = c => Math.max(Math.abs(c.x-x),Math.abs(c.y-y)) <= MAP_HINT_R;
+  return { ok:true, pos, enc, hints: city ? {howl:false,car:false} : { howl: !bossDead && near(b) && !(b.x===x&&b.y===y), car: near(v) && !(v.x===x&&v.y===y) } };
+}
+async function mapSync(){
+  if(!isOnlineMode() || !ON.token) return;
+  try{
+    const r = await onlineRpc({ a:'mapState', t:ON.token });
+    if(r && r.ok){ profile.mapPos = r.pos; mapHints = r.hints || mapHints; profile.mapBosses = r.bosses; await saveProfile(); renderMapPanel(); }
+  }catch(e){}
+}
+
+// ---------- เดิน ----------
+async function mapStep(dx, dy){
+  if(mapBusy || battleActive) return;
+  const p = mapPos();
+  const x = p.x+dx, y = p.y+dy;
+  if(x<0 || y<0 || x>=MAP_W || y>=MAP_H){ showToast('สุดขอบแผนที่แล้ว'); return; }
+  if(!profile.lockedTeamIds){ showToast('ต้องเลือกทีมแล้วกดยืนยันในเมืองก่อนออกเดินทาง'); return; }
+  const toCity = mapIsCity(x,y);
+  if(profile.stamina < 1){ showToast('สเตมิน่าหมด — ใช้เสบียงหรือรอฟื้น (1 หน่วย / 2 นาที)'); return; }
+  if(!toCity && !mapTeamAlive()){ showToast('ทีมหมดเลือด — ใช้น้ำยาเพิ่มเลือดก่อน'); return; }
+  mapBusy = true; renderMapPanel();
+  let r;
+  try{
+    r = (isOnlineMode() && ON.token) ? await onlineRpc({ a:'mapMove', t:ON.token, x, y, snap: toCity ? null : buildPvpSnapshot() }) : mapLocalMove(x,y);
+  }catch(e){ r = { ok:false, error:'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่' }; }
+  mapBusy = false;
+  if(!r || !r.ok){ if(r && r.pos) profile.mapPos = r.pos; showToast((r && r.error) || 'เดินไม่สำเร็จ'); renderMapPanel(); return; }
+  profile.stamina -= 1;
+  questAdd('stamina', 1);
+  const wasTown = p.city;
+  profile.mapPos = r.pos;
+  mapHints = r.hints || { howl:false, car:false };
+  if(!(r.enc && r.enc.type==='vet') && profile.veteranUntil) profile.veteranUntil = 0;
+  if(profile.mapRadar && profile.mapRadar.steps > 0){ profile.mapRadar.steps--; if(profile.mapRadar.steps<=0) profile.mapRadar = null; }
+  await saveProfile(); renderHud();
+  if(wasTown && !r.pos.city) showToast('🚶 ออกจากเมือง — นอกเมืองใช้ได้แค่ของในกระเป๋า');
+  if(mapHints.howl) showToast('🔊 ได้ยินเสียงโหยหวน… มีบอสอยู่แถวนี้!');
+  else if(mapHints.car) showToast('🚚 ได้ยินเสียงรถ… น่าจะมีคนอยู่แถวนี้');
+  const enc = r.enc;
+  if(enc && enc.type==='city'){
+    showToast(`${MAP_CITY_INFO[enc.zone].icon} เข้าเมือง${MAP_CITY_INFO[enc.zone].name} — จุดเกิดใหม่ถูกบันทึกแล้ว`);
+    renderMapPanel(); renderAll(); return;
+  }
+  if(enc && enc.type==='vet'){
+    profile.veteranUntil = Date.now() + 10*60000;
+    questAdd('vet', 1);
+    await saveProfile(); renderMapPanel();
+    showToast('🎖️ เจอทหารผ่านศึกลึกลับ!'); openVeteranShop(); return;
+  }
+  if(enc && enc.type==='boss'){ startBattle(r.pos.z, { map:{ cell:mapCellKey(x,y), zone:r.pos.z, boss:true, w:enc.w, reward:enc.reward }, enemies: mapBossTeam(r.pos.z) }); return; }
+  if(enc && enc.type==='pvp'){
+    profile.pvpDay = thDayKey(); profile.pvpCount = enc.count;
+    await saveProfile();
+    startPvpBattle(r.pos.z, enc.target, enc.attackId);
+    if(pvpBattle) pvpBattle.map = { cell:mapCellKey(x,y) };
+    return;
+  }
+  if(mapCleared(x,y)){ renderMapPanel(); return; }
+  startBattle(r.pos.z, { map:{ cell:mapCellKey(x,y), zone:r.pos.z }, enemies: mapEnemyTeam(r.pos.z, x, y) });
+}
+// แพ้ยกทีม → กลับไปเกิดที่เมืองล่าสุด
+async function mapRespawn(){
+  const p = mapPos();
+  const lc = MAP_CITIES[p.lc] ? p.lc : 'hospital';
+  if(isOnlineMode() && ON.token){
+    try{ const r = await onlineRpc({ a:'mapRespawn', t:ON.token }); if(r && r.ok){ profile.mapPos = r.pos; } }catch(e){}
+  }
+  if(!profile.mapPos.city) profile.mapPos = { x:MAP_CITIES[lc].x, y:MAP_CITIES[lc].y, z:lc, city:true, lc };
+  profile.mapRadar = null; profile.veteranUntil = 0;
+  await saveProfile();
+  logLine('sys', `🏥 ฟื้นคืนชีพที่${MAP_CITY_INFO[profile.mapPos.lc||lc].name} (เมืองล่าสุด)`);
+}
+
+// ---------- ของนอกเมือง ----------
+async function mapOrderPotions(){
+  if(battleActive) return;
+  if(profile.coins < MAP_DELIVERY_COST){ showToast(`เหรียญไม่พอ (ค่าส่งด่วน ${MAP_DELIVERY_COST.toLocaleString()}🪙)`); return; }
+  const isNew = !(bagItems.heal_potion > 0);
+  const types = Object.keys(bagItems).filter(k=>bagItems[k]>0).length;
+  if(isNew && types >= getBagCap()){ showToast('กระเป๋าเต็ม — ต้องมีช่องว่างสำหรับน้ำยา'); return; }
+  if(!confirm(`สั่งน้ำยาเพิ่มเลือดส่งด่วน ${MAP_DELIVERY_QTY} ขวด ราคา ${MAP_DELIVERY_COST.toLocaleString()} เหรียญ?`)) return;
+  profile.coins -= MAP_DELIVERY_COST;
+  bagItems.heal_potion = (bagItems.heal_potion||0) + MAP_DELIVERY_QTY;
+  await saveProfile(); await saveBagItems();
+  renderAll(); renderMapPanel();
+  showToast(`📦 คนส่งของมาถึงแล้ว! ได้น้ำยาเพิ่มเลือด ${MAP_DELIVERY_QTY} ขวด`);
+}
+async function mapUseRadar(zone){
+  if(battleActive) return;
+  if(!MAP_PVP_ZONES.includes(zone)) return;
+  const id = 'radar_'+zone;
+  if(bagOnlyQty(id)<=0){ showToast(inTown() ? 'ต้องมีเรดาห์โซนนี้ในกระเป๋า (ของในคลังใช้ไม่ได้)' : 'ไม่มีเรดาห์โซนนี้ในกระเป๋า'); return; }
+  if(!isOnlineMode() || !ON.token){ showToast('เรดาห์ใช้ได้เฉพาะโหมดออนไลน์'); return; }
+  let r;
+  try{ r = await onlineRpc({ a:'mapRadar', t:ON.token, zone }); }catch(e){ showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); return; }
+  if(!r || !r.ok){ showToast((r&&r.error)||'สแกนไม่สำเร็จ'); return; }
+  bagItems[id]--; if(bagItems[id]<=0) delete bagItems[id];
+  profile.mapRadar = { zone, list:r.list, steps:MAP_RADAR_STEPS, ts:Date.now() };
+  await saveBagItems(); await saveProfile();
+  renderMapPanel();
+  showToast(`📡 สแกน${MAP_ZONE_NAME[zone]}: เจอผู้เล่น ${r.list.length} คน (ผลอยู่ได้ ${MAP_RADAR_STEPS} ก้าว)`);
+}
+
+// ---------- หน้าจอแผนที่ ----------
+function mapCellHtml(x, y, p, size){
+  const z = mapZoneOf(x,y);
+  const city = mapIsCity(x,y);
+  const me = x===p.x && y===p.y;
+  const rd = profile.mapRadar && profile.mapRadar.list ? profile.mapRadar.list.filter(o=>o.x===x && o.y===y) : [];
+  const adj = Math.abs(x-p.x)+Math.abs(y-p.y)===1;
+  let ic = '';
+  if(me) ic = '🧍';
+  else if(city) ic = MAP_CITY_INFO[z].icon;
+  else if(rd.length) ic = rd.some(o=>o.red) ? '🟥' : '👤';
+  const cleared = !city && !me && mapCleared(x,y);
+  const title = city ? MAP_CITY_INFO[z].name : rd.length ? rd.map(o=>`${o.n} Lv.${o.lv}${o.bounty?` 🎯${o.bounty}💎`:''}`).join(', ') : `${MAP_ZONE_NAME[z]} (${x},${y})`;
+  return `<div class="mcell ${me?'me':''} ${adj&&!battleActive?'adj':''} ${cleared?'clr':''} ${city?'city':''}" style="width:${size}px;height:${size}px;background:${MAP_ZONE_COLOR[z]};font-size:${Math.round(size*0.6)}px;" title="${esc(title)}" ${adj?`onclick="mapStep(${x-p.x},${y-p.y})"`:''}>${ic}</div>`;
+}
+function renderMapPanel(){
+  const root = document.getElementById('mapRoot'); if(!root || !profile) return;
+  const setup = document.getElementById('battleSetup'), wheel = document.getElementById('battleWheelBox');
+  const p = mapPos();
+  const town = !!p.city;
+  if(!battleActive){
+    if(setup) setup.style.display = town ? 'block' : 'none';
+    if(wheel) wheel.style.display = town ? 'block' : 'none';
+  }
+  const z = p.z || mapZoneOf(p.x,p.y);
+  const half = Math.floor(MAP_VIEW/2);
+  const x0 = Math.max(0, Math.min(MAP_W-MAP_VIEW, p.x-half)), y0 = Math.max(0, Math.min(MAP_H-MAP_VIEW, p.y-half));
+  const width = Math.min(root.clientWidth || 340, 440);
+  const size = Math.max(22, Math.floor((width-4)/MAP_VIEW) - 2);
+  let grid = '';
+  for(let y=y0; y<y0+MAP_VIEW; y++){ grid += '<div class="mrow">'; for(let x=x0; x<x0+MAP_VIEW; x++) grid += mapCellHtml(x,y,p,size); grid += '</div>'; }
+  const zo = (typeof guildState!=='undefined' && guildState.zoneOwners) ? guildState.zoneOwners[z] : null;
+  const hint = mapHints.howl ? '<div class="mhint howl">🔊 ได้ยินเสียงโหยหวน… มีบอสอยู่ในระยะ 9×9 ช่องรอบตัว!</div>' : mapHints.car ? '<div class="mhint car">🚚 ได้ยินเสียงรถ… น่าจะมีคนอยู่แถวนี้ (ทหารผ่านศึก)</div>' : '';
+  const rd = profile.mapRadar;
+  const radarInfo = rd ? `<div class="note" style="margin:4px 0;">📡 เรดาห์${MAP_ZONE_NAME[rd.zone]}: ${rd.list.length ? rd.list.map(o=>`${o.red?'🟥':''}${esc(o.n)} Lv.${o.lv} (${o.x},${o.y})${o.bounty?` 🎯${o.bounty}💎`:''}${o.shield?' 🛡️':''}`).join(' · ') : 'ไม่พบผู้เล่น'} — เหลือ ${rd.steps} ก้าว</div>` : '';
+  const pvpZone = MAP_PVP_ZONES.includes(z);
+  const items = `<div class="mitems">
+      <button class="primary" onclick="openHealPicker()">🧪 น้ำยา (${usableQty('heal_potion')})</button>
+      <button class="ghost" onclick="useSupplies()" ${usableQty('oil')?'':'disabled'}>🎒 เสบียง (${usableQty('oil')})</button>
+      ${town ? '' : `<button class="diamond" onclick="mapOrderPotions()">📦 สั่งน้ำยา ${MAP_DELIVERY_QTY} ขวด · ${MAP_DELIVERY_COST.toLocaleString()}🪙</button>`}
+    </div>
+    <div class="mitems">${MAP_PVP_ZONES.map(zz=>`<button class="ghost" onclick="mapUseRadar('${zz}')" ${bagOnlyQty('radar_'+zz)?'':'disabled'}>📡 ${MAP_ZONE_NAME[zz].replace('โซน','')} (${bagOnlyQty('radar_'+zz)})</button>`).join('')}</div>`;
+  const cityBox = town ? `<div class="mcitybox">
+      <b>${MAP_CITY_INFO[z].icon} ${MAP_CITY_INFO[z].name}</b> — ปลอดภัย · ใช้ร้านค้า/คลัง/ตลาด/กิล/อารีน่า/หอคอยได้ · ตายแล้วจะกลับมาเกิดที่นี่
+      ${z==='ruins' ? `<div class="row" style="margin-top:6px;"><button class="primary" onclick="startBattle('pipe')" ${profile.pipeTickets>0?'':'disabled'}>🕳️ ลงด่านท่อน้ำ (🎫 ${profile.pipeTickets||0})</button><button class="ghost" onclick="buyPipeMap()">🎫 ซื้อบัตร ${PIPE_MAP_COST.toLocaleString()}🪙</button></div>` : ''}
+    </div>` : '';
+  const mini = mapShowMini ? mapMiniHtml(p) : '';
+  root.innerHTML = `
+    <div class="mhead">
+      <div><b>${town ? MAP_CITY_INFO[z].icon+' '+MAP_CITY_INFO[z].name : MAP_ZONE_NAME[z]}</b> <span class="note" style="margin:0;">(${p.x},${p.y}) · Lv.${STAGE_LEVELS[z][0]}–${STAGE_LEVELS[z][1]+(MAP_BOSS_INFO[z].lv>STAGE_LEVELS[z][1]?'':'')}${pvpZone?' · ⚔️ PVP':' · 🕊️ ไม่มี PVP'}</span>
+        ${zo && zo.gid ? `<div class="note" style="margin:0;">👑 ครองโดย ${esc(zo.gname)}${zo.gid===profile.guildId?' (กิลเรา)':' · เสียภาษี'}</div>` : ''}</div>
+      <button class="ghost" style="flex:0 0 auto;" onclick="mapShowMini=!mapShowMini;renderMapPanel()">🗺️ ${mapShowMini?'ซ่อน':'แผนที่รวม'}</button>
+    </div>
+    ${hint}
+    <div class="mgrid ${mapBusy?'busy':''}">${grid}</div>
+    <div class="mpad">
+      <button onclick="mapStep(0,-1)">▲</button>
+      <div><button onclick="mapStep(-1,0)">◀</button><span class="note" style="margin:0 6px;">⚡${profile.stamina}</span><button onclick="mapStep(1,0)">▶</button></div>
+      <button onclick="mapStep(0,1)">▼</button>
+    </div>
+    <div class="note" style="text-align:center;margin:2px 0 6px;">แตะช่องข้างตัว หรือปุ่มลูกศร · 1 ช่อง = ⚡1 = เจอศัตรู 1 ครั้ง · ช่องที่ชนะแล้วว่าง 5 นาที${mapBusy?' · ⏳ กำลังเดิน…':''}</div>
+    ${radarInfo}
+    ${items}
+    ${cityBox}
+    ${mini}`;
+}
+async function mapAfterLoad(){
+  await mapSync();
+  if(profile && !inTown()){ goTab('battle'); showToast('🗺️ คุณอยู่นอกเมือง — เดินกลับเมืองเพื่อใช้เมนูอื่น'); }
+}
+function mapMiniHtml(p){
+  const s = 7;
+  let h = '';
+  for(let y=0;y<MAP_H;y++){ h += '<div class="mrow">'; for(let x=0;x<MAP_W;x++){
+    const me = x===p.x && y===p.y, city = mapIsCity(x,y);
+    h += `<div style="width:${s}px;height:${s}px;background:${me?'#fff':city?'#ffd54a':MAP_ZONE_COLOR[mapZoneOf(x,y)]};"></div>`;
+  } h += '</div>'; }
+  return `<div class="panel" style="margin-top:8px;padding:8px;"><div class="note" style="margin:0 0 4px;">แผนที่รวม 40×40 · ⬜ คุณ · 🟨 เมือง</div><div class="mmini">${h}</div>
+    <div class="note">${Object.keys(MAP_CITY_INFO).map(k=>`${MAP_CITY_INFO[k].icon} ${MAP_CITY_INFO[k].name} (${MAP_CITIES[k].x},${MAP_CITIES[k].y})`).join(' · ')}</div></div>`;
+}
+
+// ---------- นอกเมือง: ล็อกเมนูอื่น ----------
+const MAP_OUT_TABS = ['battle','team','rank'];
+const MAP_OUT_FUNCS = new Set(['useHealPotion','useSupplies','useExpPotion','useDropPotion','openMoneyBox','allocateStatPoint',
+  'vetBuyDnaBox','vetBuyRadar','vetMoneyBoxService','vetBuyGold','vetDonate','vetSellGold','claimQuest','useVipBox','openDnaBox']);
+function mapTownBlocked(name){
+  if(typeof profile==='undefined' || !profile || inTown()) return false;
+  if(name && MAP_OUT_FUNCS.has(name)) return false;
+  return true;
+}
+
 function guardAsync(fn){
   return async function(...args){
     if(__actionBusy){
       showToast('กำลังทำรายการอยู่ กรุณารอสักครู่');
       return;
     }
+    if(mapTownBlocked(fn.name)){ showToast('🏙️ อยู่นอกเมือง — ใช้ได้แค่ของในกระเป๋า ต้องกลับเข้าเมืองก่อน'); return; }
     if(battleActive){ showToast('⚔️ ระหว่างต่อสู้ใช้ฟังก์ชันอื่นไม่ได้ — ปิดไฟต์ก่อน'); return; }
     __actionBusy = true;
     try{
