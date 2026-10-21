@@ -189,7 +189,8 @@
   .mcell{ position:relative; display:flex; align-items:center; justify-content:center; line-height:1; opacity:.86; outline:1px solid rgba(130,130,130,.55); outline-offset:-1px; }
   .mcell.ruin{ opacity:.93; background-image:repeating-linear-gradient(45deg, rgba(255,255,255,.03) 0 3px, transparent 3px 6px); }
   .mcell.clr{ filter:brightness(.45) saturate(.6); }
-  .mcell.city{ opacity:1; outline:2px solid #3ddc56; outline-offset:-2px; }
+  .mcell.city{ opacity:1; outline:2px solid #ffd54a; outline-offset:-2px; background:radial-gradient(circle, #fff3c4 0%, #e0a83a 55%, #7a4d10 100%) !important; box-shadow:0 0 8px rgba(255,213,74,.8) !important; z-index:1; }
+  .mcity{ font-size:1.9em; line-height:1; filter:drop-shadow(0 1px 1px rgba(0,0,0,.7)); }
   .mcell.me{ opacity:1; outline:2px solid #ff3b3b; outline-offset:-2px; box-shadow:0 0 10px rgba(255,60,60,.8) !important; z-index:2; }
   .mcell.adj{ cursor:pointer; outline:2px solid rgba(255,255,255,.75); outline-offset:-2px; opacity:1; }
   .mcell.adj:hover{ filter:brightness(1.4); }
@@ -445,8 +446,7 @@
         <h2>💎 สุ่ม DNA (เพชร A–SSS)</h2>
         <div class="note">A 75% · S 20% · SS 4% · SSS 1%</div>
         <div class="row" style="margin-top:10px;">
-          <button class="diamond" onclick="doDNARoll('diamond',1)">สุ่ม 1 ครั้ง · 199</button>
-          <button class="diamond" onclick="doDNARoll('diamond',10)">สุ่ม 10 ครั้ง · 1,800</button>
+          <button class="diamond" id="btnDnaRoll" onclick="doDNARoll('diamond',1)">สุ่ม 1 ครั้ง · 1,000💎</button>
         </div>
       </div>
 
@@ -563,7 +563,7 @@
         <div class="row" style="margin-top:10px;">
           <button class="primary" id="btnStep" onclick="battleStep()">ตีต่อ ▶</button>
           <button class="ghost" id="btnAuto" onclick="toggleAutoBattle()">อัตโนมัติ</button>
-          <button class="diamond" id="btnInstant" onclick="fastBattle()" title="แพ็ค VIP">⚡ อัตโนมัติเร็ว</button>
+          <button class="diamond" id="btnInstant" onclick="fastBattle()">⚡ อัตโนมัติเร็ว</button>
           <button class="primary" id="btnModeNext" style="display:none;" onclick="modeNextClick()">▶ ต่อ</button>
           <button class="ghost" onclick="closeBattle()">ออก</button>
         </div>
@@ -981,7 +981,9 @@ async function onlineLogin(){
   if(r.created) showToast(`สมัครสำเร็จ! จำรหัสผ่านไว้ใช้เข้าเกมครั้งต่อไป`);
 }
 async function onlineLogout(){
-  if(!confirm('ออกจากระบบ?')) return;
+  const outside = typeof inTown==='function' && profile && !inTown();
+  if(!confirm(outside ? 'ออกจากระบบตอนอยู่นอกเมือง?\nตัวละครจะยังยืนอยู่ที่เดิมบนแผนที่ (โซน PVP ผู้เล่นอื่นดักได้แม้ออฟไลน์)' : 'ออกจากระบบ?')) return;
+  try{ await mapQ; }catch(e){}
   if(ON.pendingPriv.size){ await onlineFlush(); }
   lsDel('fight5_token');
   location.reload();
@@ -1388,7 +1390,7 @@ async function devMapDo(op, zone, kind){
   else if(op==='warpNear'){
     const mi = DEV.mapInfo; if(!mi) return;
     const t = mi.zones[zone][kind];
-    const cand = [[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy])=>({x:t.x+dx, y:t.y+dy})).find(c=> c.x>=0 && c.y>=0 && c.x<MAP_W && c.y<MAP_H && !mapIsCity(c.x,c.y) && mapZoneOf(c.x,c.y)===zone);
+    const cand = [[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy])=>({x:t.x+dx, y:t.y+dy})).find(c=> c.x>=0 && c.y>=0 && c.x<MAP_W && c.y<MAP_H && !mapIsCity(c.x,c.y) && !mapIsRuin(c.x,c.y) && mapZoneOf(c.x,c.y)===zone);
     if(!cand){ showToast('หาช่องข้างๆ ไม่ได้'); return; }
     req.op = 'warp'; req.x = cand.x; req.y = cand.y;
   }
@@ -1620,7 +1622,7 @@ function renderGuide(){
   Object.entries(DNA_DEFS).forEach(([fac, list])=> list.forEach(d=> dnaRows.push([
     `${FACTIONS[fac].icon} ${FACTIONS[fac].name}`, `<b>${d.name}</b>${DNA_ACTIVE_IDS.includes(d.id)?'':' <span style="color:var(--text-dim)">🚧 เร็วๆ นี้</span>'}`, d.desc ])));
   secs.push(gSec('🧬 DNA', `
-    <b>ได้จาก:</b> สุ่มด้วยเพชร (1 ครั้ง ${GACHA_COST.diamond[1]}💎 · 10 ครั้ง ${GACHA_COST.diamond[10]}💎) · ชำแหละชิ้นส่วน · รางวัลล็อกอิน · กิล · โค้ด<br>
+    <b>ได้จาก:</b> สุ่มด้วยเพชร (ครั้งละ ${GACHA_COST.diamond[1].toLocaleString()}💎) · ชำแหละชิ้นส่วน · รางวัลล็อกอิน · กิล · โค้ด<br>
     แต่ละแพ็คมี <b>เกรด</b> และ <b>เผ่าหลัก</b> · เก็บได้สูงสุด ${DNA_CAP} แพ็ค · ติดตั้งทับของเดิมได้ (ของเดิมหายไป)<br>
     <b>จำนวนช่องพาสซีฟตามเกรด:</b>
     ${gTable(['เกรด','ช่อง'], GRADE_ORDER.map(g=>[gradeChip(g), DNA_SLOT_CONFIG[g].map(k=>DNA_SLOT_LABEL[k]).join(' · ')]))}
@@ -1654,7 +1656,7 @@ function renderGuide(){
     • แผนที่ ${MAP_W}×${MAP_H} ช่อง แบ่ง 4 โซน: ↖️ โรงพยาบาล · ↗️ ค่ายทหาร · ↙️ โรงเรียน · ↘️ ซากเมือง — แต่ละโซนมีเมือง 1 แห่ง (${Object.keys(MAP_CITY_INFO).map(k=>MAP_CITY_INFO[k].icon+' '+MAP_CITY_INFO[k].name).join(' · ')})<br>
     • 📍 พิกัดตาราง: คอลัมน์ A–${mapColName(MAP_W-1)} (ซ้าย→ขวา) · แถว 1–${MAP_H} (บน→ล่าง) เช่น B5 — กดปุ่ม "บอกพิกัดในแชท" เพื่อบอกเพื่อนตอนเจอบอส<br>
     • ☠️ ความอันตราย: แถบสีขอบล่างช่อง เขียว → เหลือง → แดง (ระดับ 1–5 ยิ่งห่างเมืองยิ่งแรง) และหัวกะโหลก ☠️ 1–3 หัว<br>
-    • เดินบน/ล่าง/ซ้าย/ขวา ทีละ 1 ช่อง = ⚡${MAP_STEP_STAMINA} และเจอศัตรู 1 ครั้งทุกช่อง · ช่องที่ชนะแล้วจะว่าง ${MAP_CLEAR_MS/60000} นาที · ยิ่งห่างเมืองศัตรูยิ่งเลเวล/เกรดสูง<br>
+    • เดินบน/ล่าง/ซ้าย/ขวา ทีละ 1 ช่อง = ⚡${MAP_STEP_STAMINA} (👑 VIP เดินแนวทแยงได้) · เจอศัตรูเฉพาะช่องที่มี ☠️ (ประมาณ ${MAP_MON_PCT}% ของช่อง สุ่มตำแหน่งใหม่ทุก ${MAP_MON_MS/60000} นาที) · ช่องที่ชนะแล้วจะว่าง ${MAP_CLEAR_MS/60000} นาที · ⬛ ซากตึกเดินผ่านไม่ได้ · ยิ่งห่างเมืองศัตรูยิ่งเลเวล/เกรดสูง<br>
     • โซนยากมอนสเตอร์ติด DNA และชิ้นส่วน: โรงเรียน DNA ${MAP_ENEMY_GEAR.school.dna*100}% · ค่ายทหาร ${MAP_ENEMY_GEAR.campground.dna*100}% (ชิ้นส่วน ${MAP_ENEMY_GEAR.campground.parts.join('–')}) · ซากเมือง ${MAP_ENEMY_GEAR.ruins.dna*100}% (ชิ้นส่วน ${MAP_ENEMY_GEAR.ruins.parts.join('–')})<br>
     • 🏙️ <b>นอกเมืองใช้ได้แค่ของในกระเป๋า</b> (น้ำยา เสบียง เรดาห์ ยา) — ตลาด ร้านค้า ตู้เซฟ คลังเพชร กิล อารีน่า บอสโลก หอคอย ใช้ได้เฉพาะในเมือง · พกน้ำยาไปเยอะๆ<br>
     • 📦 น้ำยาหมดกลางทาง: สั่งส่งด่วน ${MAP_DELIVERY_QTY} ขวด ราคา ${MAP_DELIVERY_COST.toLocaleString()}🪙 (เข้ากระเป๋าทันที)<br>
@@ -1669,7 +1671,8 @@ function renderGuide(){
     ${gTable(['โซน','เลเวลมอน','เกรดศัตรู','เหรียญ','EXP'], Object.entries(STAGES).filter(([k,st])=>!st.isBoss).map(([k,st])=>[MAP_ZONE_NAME[k], stageLvText(k), st.grades.join('–'), `${st.coinRange[0]}–${st.coinRange[1]}`, st.expReward]))}
     • มอนสเตอร์มีเลเวลตามด่าน สเตตัสโตต่อเลเวล HP +${ENEMY_LV_GROWTH.hp*100}% · ATK +${ENEMY_LV_GROWTH.atk*100}% · DEF +${ENEMY_LV_GROWTH.def*100}% · SPD +${ENEMY_LV_GROWTH.spd*100}%<br>
     • ตัวละครเลเวลเกินมอนสูงสุดของด่านเกิน ${EXP_OVERLEVEL_FREE} เลเวล ได้ EXP ลดลง ${EXP_OVERLEVEL_STEP*100}% ต่อเลเวล (เหลืออย่างน้อย 10%)<br>
-    • 👑 แพ็ค VIP (${VIP_PRICE}💎/${VIP_DAYS} วัน): ⚡ สู้อัตโนมัติเร็ว (ตีเองเร็ว ~6 เท่า · บนแผนที่ชนะแล้วกลับแผนที่ให้เอง)<br>
+    • ⚡ สู้อัตโนมัติเร็ว ใช้ได้ทุกคน (ตีเองเร็ว ~6 เท่า · บนแผนที่เปิดค้างได้ ชนะแล้วกลับแผนที่ให้เอง)<br>
+    • 👑 แพ็ค VIP (${VIP_PRICE}💎/${VIP_DAYS} วัน): ↗️ เดินแนวทแยงบนแผนที่ได้ (ไปได้ทั้ง 8 ช่องรอบตัว ⚡1)<br>
     • ทุกรอบเรียงลำดับตาม SPD สูงตีก่อน · เลือดต่อเนื่องจากไฟต์ก่อน (ไม่ฟื้นเอง ต้องใช้น้ำยา)<br>
     • คริติคอลสูงสุด 70% (เกินจะเพิ่มแรงคริแทน) · หลบสูงสุด 70% (เกินจะสวนกลับ) · DEF% สูงสุด 80% (เกินจะสะท้อนดาเมจ)<br>
     • พิษ: เสียเลือดตามเปอร์เซ็นต์ทุกเทิร์น และ ATK -10% ระหว่างติดพิษ<br>
@@ -2427,11 +2430,12 @@ function makeEnemyChar(faction, grade, level=1){
   };
 }
 
-const GACHA_COST = { coin:{1:100, 10:900}, diamond:{1:199, 10:1800} };
+const GACHA_COST = { coin:{1:100, 10:900}, diamond:{1:1000} };   // สุ่ม DNA เพชร: ครั้งละ 1 เท่านั้น (ราคาแก้ในชีท gacha_dna_price)
 
 async function doDNARoll(kind, times){
   if(dnaPackages.length + times > DNA_CAP){ showToast(`คลัง DNA เต็ม (สูงสุด ${DNA_CAP} ชิ้น)`); return; }
   const cost = GACHA_COST[kind][times];
+  if(cost == null){ showToast('สุ่มแบบนี้ปิดแล้ว'); return; }
   const bal = kind==='coin' ? profile.coins : profile.diamonds;
   if(bal < cost){ showToast(kind==='coin' ? 'เหรียญไม่พอ' : 'เพชรไม่พอ'); return; }
   if(kind==='coin') profile.coins -= cost; else profile.diamonds -= cost;
@@ -4231,7 +4235,7 @@ async function endBattle(result){
     questBattleResult(true, battleUnits.filter(u=>u.side==='me' && !u.isMinion).every(u=>u.curHp>0));
     if(!mb && maybeSpawnVeteran(currentDiff)) questAdd('vet', 1);
     if(mb){
-      const pp = mapPos(); mapMarkCleared(pp.x, pp.y);
+      { const ck = String(mb.cell||'').split(',').map(Number); if(ck.length===2 && isFinite(ck[0]) && isFinite(ck[1])) mapMarkCleared(ck[0], ck[1]); else { const pp = mapPos(); mapMarkCleared(pp.x, pp.y); } }
       if(mb.boss){
         if(isOnlineMode() && ON.token){
           try{
@@ -4255,7 +4259,7 @@ async function endBattle(result){
     logLine('sys', `⚖️ เสมอ`);
   }
   document.getElementById('btnStep').disabled = true;
-  if(mb && result==='win' && profile.mapAuto && isVip()) setTimeout(()=>{ if(battleActive && battleOver && !pvpBattle && !modeBattle && !warBattle) closeBattle(); }, 700);
+  if(mb && result==='win' && profile.mapAuto) setTimeout(()=>{ if(battleActive && battleOver && !pvpBattle && !modeBattle && !warBattle) closeBattle(); }, 700);
 }
 
 // advances exactly one actor's turn
@@ -5666,7 +5670,7 @@ function renderVipPanel(){
   const el = document.getElementById('vipPanel'); if(!el || !profile) return;
   const on = isVip();
   el.innerHTML = `<h2>👑 แพ็ค VIP</h2>
-    <div class="note">สิทธิ์ VIP: <b>⚡ สู้อัตโนมัติเร็ว</b> (ทุกไฟต์ + เปิดค้างบนแผนที่ได้) · 🔒 ล็อกของที่สวมใส่ 1 ชิ้น · 🏦 ฝาก/ถอนคลังเพชรได้วันละ ${VAULT_DAILY_LIMIT_VIP} (ปกติ ${VAULT_DAILY_LIMIT})</div>
+    <div class="note">สิทธิ์ VIP: <b>↗️ เดินแนวทแยงบนแผนที่</b> (8 ทิศ ⚡1) · 🔒 ล็อกของที่สวมใส่ 1 ชิ้น · 🏦 ฝาก/ถอนคลังเพชรได้วันละ ${VAULT_DAILY_LIMIT_VIP} (ปกติ ${VAULT_DAILY_LIMIT})</div>
     <div class="part-pick-item"><div>${on ? `✅ VIP ใช้งานอยู่ ถึง <b>${fmtThDate(profile.vipUntil)}</b>` : 'ยังไม่ได้เป็น VIP'}<div class="note" style="margin:2px 0 0;">${VIP_PRICE}💎 / ${VIP_DAYS} วัน · ซื้อซ้ำ = ต่ออายุเพิ่ม ${VIP_DAYS} วัน</div></div>
       <button class="diamond" onclick="buyVip()" ${profile.diamonds<VIP_PRICE?'disabled':''}>${on?'ต่ออายุ':'ซื้อ'} · ${VIP_PRICE}💎</button></div>
     <div class="note" style="margin-top:8px;">🔒 <b>ล็อกของที่สวมใส่ 1 ชิ้น</b> (DNA ที่ติดตั้ง / ชิ้นส่วนอวัยวะ / อุปกรณ์) — ชิ้นที่ล็อกจะไม่ตกเมื่อแพ้ยกทีมหรือโดนดัก${on?'':' (เฉพาะ VIP)'}</div>
@@ -5675,7 +5679,7 @@ function renderVipPanel(){
       return `<select style="width:100%;margin-top:4px;" onchange="setVipLock(this.value)"><option value="">— ไม่ล็อก —</option>${opts.map(o=>`<option value="${o.key}" ${o.key===cur?'selected':''}>${esc(o.label)}</option>`).join('')}</select>
         ${cur && !valid ? '<div class="note">⚠️ ของที่เคยล็อกไม่ได้สวมอยู่แล้ว เลือกใหม่ได้</div>' : ''}`; })() : ''}`;
   const b = document.getElementById('btnInstant');
-  if(b) b.textContent = on ? '⚡ อัตโนมัติเร็ว' : '🔒 อัตโนมัติเร็ว (VIP)';
+  if(b) b.textContent = '⚡ อัตโนมัติเร็ว';
 }
 async function buyVip(){
   if(profile.diamonds < VIP_PRICE){ showToast('เพชรไม่พอ'); return; }
@@ -5685,9 +5689,8 @@ async function buyVip(){
   renderAll();
   showToast(`👑 เป็น VIP ถึง ${fmtThDate(profile.vipUntil)}`);
 }
-// ⚡ สู้อัตโนมัติเร็ว (VIP) — ตีเองทีละเทิร์นเร็วๆ ให้เห็นการต่อสู้ (แทนปุ่มจบทันทีแบบเดิม)
+// ⚡ สู้อัตโนมัติเร็ว (ทุกคน) — ตีเองทีละเทิร์นเร็วๆ ให้เห็นการต่อสู้ (แทนปุ่มจบทันทีแบบเดิม)
 function fastBattle(){
-  if(!isVip()){ showToast('👑 สู้อัตโนมัติเร็ว สำหรับแพ็ค VIP — ซื้อได้ที่แท็บ 🏪 ตลาด'); return; }
   if(!battleActive || battleOver) return;
   if(autoTimer) clearInterval(autoTimer);
   autoOn = true; document.getElementById('btnAuto').textContent = 'หยุดอัตโนมัติ';
@@ -6533,7 +6536,8 @@ const GCFG_DEFAULT = {
          map_pvp_hospital:0, map_pvp_school:1, map_pvp_campground:1, map_pvp_ruins:1,
          map_boss_hospital_dia:20, map_boss_hospital_coin:1500, map_boss_hospital_exp:150, map_boss_school_dia:40, map_boss_school_coin:3000, map_boss_school_exp:400,
          map_boss_campground_dia:80, map_boss_campground_coin:6000, map_boss_campground_exp:900, map_boss_ruins_dia:150, map_boss_ruins_coin:10000, map_boss_ruins_exp:2000,
-         radar_price_school:500, radar_price_campground:1500, radar_price_ruins:2500 },
+         radar_price_school:500, radar_price_campground:1500, radar_price_ruins:2500,
+         map_mon_pct:40, map_mon_min:60, map_mon_power:115, gacha_dna_price:1000 },
 };
 let GCFG = JSON.parse(JSON.stringify(GCFG_DEFAULT));
 function cfgSet(k){ const v = GCFG.set && GCFG.set[k]; return v!=null ? Number(v) : Number(GCFG_DEFAULT.set[k]||0); }
@@ -7277,6 +7281,7 @@ let MAP_HINT_R = 1;                  // รัศมี 3×3 (ช่องติ
 let MAP_BOSS_MS = 30*60000, MAP_VET_MS = 30*60000;
 let MAP_PVP_ZONES = ['school','campground','ruins'];
 let MAP_STEP_STAMINA = 1;
+let MAP_MON_PCT = 40, MAP_MON_MS = 60*60000, MAP_MON_POWER = 1.15;   // จุดมอนสเตอร์ % ของช่อง · สุ่มตำแหน่งใหม่ทุก 60 นาที · ความเก่ง x1.15
 const MAP_CITIES = { hospital:{x:15,y:20}, campground:{x:54,y:4}, school:{x:4,y:45}, ruins:{x:54,y:54} };
 const MAP_CITY_INFO = { hospital:{name:'นิคมโรงพยาบาล',icon:'🏥'}, school:{name:'ชุมชนโรงเรียน',icon:'🏫'}, campground:{name:'ฐานทัพค่ายทหาร',icon:'🪖'}, ruins:{name:'ป้อมซากเมือง',icon:'🏚️'} };
 const MAP_ZONE_NAME = { hospital:'โซนโรงพยาบาล', school:'โซนโรงเรียน', campground:'โซนค่ายทหาร', ruins:'โซนซากเมือง' };
@@ -7299,6 +7304,11 @@ function applyMapCfg(){
   MAP_BOSS_MS = Math.max(5, n('map_boss_min',30))*60000;
   MAP_VET_MS = Math.max(5, n('map_vet_min',30))*60000;
   MAP_STEP_STAMINA = Math.max(0, Math.floor(n('map_step_stamina',1)));
+  MAP_MON_PCT = Math.max(0, Math.min(100, n('map_mon_pct',40)));
+  MAP_MON_MS = Math.max(5, n('map_mon_min',60))*60000;
+  MAP_MON_POWER = Math.max(0.3, n('map_mon_power',115)/100);
+  GACHA_COST.diamond = { 1: Math.max(1, Math.floor(n('gacha_dna_price',1000))) };
+  const db = document.getElementById('btnDnaRoll'); if(db) db.textContent = `สุ่ม 1 ครั้ง · ${GACHA_COST.diamond[1].toLocaleString()}💎`;
   MAP_PVP_ZONES = Object.keys(MAP_CITIES).filter(z => n('map_pvp_'+z, z==='hospital'?0:1) > 0);
   Object.keys(MAP_BOSS_INFO).forEach(z=>{ MAP_BOSS_INFO[z].exp = Math.max(0, Math.floor(n('map_boss_'+z+'_exp', MAP_BOSS_INFO[z].exp))); });
   Object.keys(RADAR_PRICES).forEach(z=>{ RADAR_PRICES[z] = Math.max(0, Math.floor(n('radar_price_'+z, RADAR_PRICES[z]))); });
@@ -7332,6 +7342,7 @@ function mapTeamAlive(){
 }
 
 // ---------- ศัตรูบนแผนที่: ยิ่งห่างเมืองยิ่งเก่ง ----------
+function mapPowerUp(c){ ['hp','atk','defFlat'].forEach(k=>{ if(c.stats && c.stats[k]) c.stats[k] = Math.round(c.stats[k]*MAP_MON_POWER); }); return c; }
 function mapDecorateEnemy(c, zone){
   const g = MAP_ENEMY_GEAR[zone] || MAP_ENEMY_GEAR.hospital;
   if(g.dna>0 && Math.random()<g.dna && DNA_SLOT_CONFIG[c.grade]){
@@ -7356,7 +7367,7 @@ function mapEnemyTeam(zone, x, y){
   for(let i=0;i<n;i++){
     const lv = Math.max(lo, Math.min(hi, Math.round(lo + (hi-lo)*t + (Math.random()*2-1))));
     const gi = Math.min(pool.length-1, Math.floor(Math.random()*(1+t*(pool.length-1)+0.3)));
-    team.push(mapDecorateEnemy(makeEnemyChar(randomFaction(), pool[gi], lv), zone));
+    team.push(mapPowerUp(mapDecorateEnemy(makeEnemyChar(randomFaction(), pool[gi], lv), zone)));
   }
   return team;
 }
@@ -7366,7 +7377,7 @@ function mapBossTeam(zone){
   boss.name = '👑 ' + b.name;
   boss.stats.hp = Math.round(boss.stats.hp*b.hp); boss.stats.atk = Math.round(boss.stats.atk*b.atk); boss.stats.defFlat = Math.round(boss.stats.defFlat*1.3);
   boss.dnaGrade = b.grade; boss.dna = DNA_SLOT_CONFIG[b.grade].map(()=> rollRandomDNA(b.faction));
-  boss.isMapBoss = true;
+  boss.isMapBoss = true; mapPowerUp(boss);
   const c = MAP_CITIES[zone];
   const escorts = mapEnemyTeam(zone, c.x+16, c.y+16).slice(0,2);
   return [boss, ...escorts];
@@ -7378,12 +7389,13 @@ function mapLocalCell(kind, zone, w){
   for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619)>>>0; }
   const ox = (zone==='hospital'||zone==='school') ? 0 : MAP_HALF, oy = (zone==='hospital'||zone==='campground') ? 0 : MAP_HALF;
   const c = MAP_CITIES[zone];
-  for(let i=0;i<10;i++){ h = Math.imul(h ^ (h>>>13), 1274126177)>>>0; const x = ox + h%MAP_HALF, y = oy + (h>>>8)%MAP_HALF; if(Math.max(Math.abs(x-c.x),Math.abs(y-c.y))>=6) return {x,y}; }
+  for(let i=0;i<10;i++){ h = Math.imul(h ^ (h>>>13), 1274126177)>>>0; const x = ox + h%MAP_HALF, y = oy + (h>>>8)%MAP_HALF; if(Math.max(Math.abs(x-c.x),Math.abs(y-c.y))>=6 && !mapIsRuin(x,y)) return {x,y}; }
   return { x:ox+5, y:oy+5 };
 }
 function mapLocalMove(x,y){
   const p = mapPos();
-  if(Math.abs(x-p.x)+Math.abs(y-p.y)!==1) return { ok:false, error:'เดินได้ทีละ 1 ช่อง', pos:p };
+  const d1 = Math.abs(x-p.x)+Math.abs(y-p.y), dc = Math.max(Math.abs(x-p.x),Math.abs(y-p.y));
+  if(!(d1===1 || (dc===1 && isVip())) || mapIsRuin(x,y)) return { ok:false, error:'เดินไปช่องนั้นไม่ได้', pos:p };
   const z = mapZoneOf(x,y), city = mapIsCity(x,y), now = Date.now();
   const pos = { x, y, z, city, lc: city ? z : (p.lc||'hospital') };
   let enc = city ? { type:'city', zone:z } : null;
@@ -7400,7 +7412,7 @@ async function mapSync(){
   await mapQ;
   try{
     const r = await onlineRpc({ a:'mapState', t:ON.token });
-    if(r && r.ok){ profile.mapPos = r.pos; mapHints = r.hints || mapHints; profile.mapBosses = r.bosses; await saveProfile(); renderMapPanel(); }
+    if(r && r.ok){ profile.mapPos = r.pos; profile.mapVer = MAP_VER; mapHints = r.hints || mapHints; profile.mapBosses = r.bosses; await saveProfile(); renderMapPanel(); }
   }catch(e){}
 }
 
@@ -7416,6 +7428,9 @@ async function mapStep(dx, dy){
   const p = mapPos();
   const x = p.x+dx, y = p.y+dy;
   if(x<0 || y<0 || x>=MAP_W || y>=MAP_H){ showToast('สุดขอบแผนที่แล้ว'); return; }
+  if(Math.abs(dx)>1 || Math.abs(dy)>1 || (dx===0 && dy===0)) return;
+  if(dx!==0 && dy!==0 && !isVip()){ showToast('↗️ เดินแนวทแยงได้เฉพาะ VIP'); return; }
+  if(mapIsRuin(x,y)){ showToast('🧱 ซากตึกขวางทาง — เดินผ่านไม่ได้'); return; }
   if(!profile.lockedTeamIds){ showToast('ต้องเลือกทีม 3 ตัวแล้วกด "ยืนยันทีม" ด้านล่างแผนที่ก่อนเดิน'); renderMapPanel(); try{ document.getElementById('battleSetup').scrollIntoView({behavior:'smooth'}); }catch(e){} return; }
   const toCity = mapIsCity(x,y);
   const stepCost = (DEV.on && DEV.freeWalk) ? 0 : MAP_STEP_STAMINA;
@@ -7439,18 +7454,23 @@ async function mapStep(dx, dy){
     const snap = toCity ? null : buildPvpSnapshot();
     mapQueue(async ()=>{
       let r;
-      try{ r = await onlineRpc({ a:'mapMove', t:ON.token, x, y, snap }); }catch(e){ r = { ok:false, error:'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ซิงก์ตำแหน่งใหม่' }; }
+      // เน็ตหลุด: ลองส่งซ้ำ (เซิร์ฟเวอร์รับซ้ำได้ ถ้าอยู่ช่องนั้นแล้วจะไม่นับเพิ่ม) แล้วค่อยยอมซิงก์ตำแหน่งจากเซิร์ฟเวอร์
+      for(let i=0;i<3;i++){
+        try{ r = await onlineRpc({ a:'mapMove', t:ON.token, x, y, snap }); break; }
+        catch(e){ r = { ok:false, net:true, error:'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ซิงก์ตำแหน่งใหม่' }; await new Promise(res=>setTimeout(res, 1500*(i+1))); }
+      }
+      if(r && r.net){ try{ const st = await onlineRpc({ a:'mapState', t:ON.token }); if(st && st.ok) r.pos = st.pos; }catch(e){} }
       mapAfterServer(r, x, y);
     });
   } else mapAfterServer(local, x, y);
   // ช่องปกติ: สู้ทันทีไม่ต้องรอเซิร์ฟเวอร์
-  if(!toCity && !mapCleared(x,y) && !(DEV.on && DEV.noEnc)) startBattle(z, { map:{ cell:mapCellKey(x,y), zone:z }, enemies: mapEnemyTeam(z, x, y) });
+  if(!toCity && mapMonAt(x,y) && !mapCleared(x,y) && !(DEV.on && DEV.noEnc)) startBattle(z, { map:{ cell:mapCellKey(x,y), zone:z }, enemies: mapEnemyTeam(z, x, y) });
   else { renderMapPanel(); if(toCity) renderAll(); }
 }
 function mapAfterServer(r, x, y){
   if(!r || !r.ok){
     mapQ = Promise.resolve();   // ทิ้งคิวที่เหลือ แล้วยึดตำแหน่งจากเซิร์ฟเวอร์
-    if(r && r.pos){ profile.mapPos = r.pos; saveProfile(); }
+    if(r && r.pos){ profile.mapPos = r.pos; profile.mapVer = MAP_VER; saveProfile(); }
     showToast((r && r.error) || 'เดินไม่สำเร็จ');
     if(!battleActive) renderMapPanel();
     return;
@@ -7490,7 +7510,7 @@ document.addEventListener('keydown', e=>{
   const t = e.target && e.target.tagName; if(t==='INPUT' || t==='TEXTAREA' || t==='SELECT') return;
   if(document.querySelector('.show')) return;
   const k = e.key.toLowerCase();
-  const d = { arrowup:[0,-1], w:[0,-1], arrowdown:[0,1], s:[0,1], arrowleft:[-1,0], a:[-1,0], arrowright:[1,0], d:[1,0] }[k];
+  const d = { arrowup:[0,-1], w:[0,-1], arrowdown:[0,1], s:[0,1], arrowleft:[-1,0], a:[-1,0], arrowright:[1,0], d:[1,0], q:[-1,-1], e:[1,-1], z:[-1,1], c:[1,1] }[k];
   if(d){ e.preventDefault(); mapStep(d[0], d[1]); }
 });
 // 📍 บอกพิกัดในแชทโลก (เติมข้อความให้ แก้ไขก่อนส่งได้)
@@ -7503,9 +7523,9 @@ function mapShareChat(){
   setTimeout(()=>{ const i = document.getElementById('chatInput'); if(i){ i.value = `📍 ${mapCoord(p.x,p.y)} (${where})${extra} `; i.focus(); } }, 200);
 }
 // ⚡ สู้อัตโนมัติบนแผนที่: ตีเร็วอัตโนมัติ ชนะแล้วปิดหน้าต่อสู้กลับแผนที่เอง
-function mapToggleAuto(){ if(!isVip()){ showToast('👑 สู้อัตโนมัติเร็ว สำหรับแพ็ค VIP — ซื้อได้ที่แท็บ 🏪 ตลาด'); return; } profile.mapAuto = !profile.mapAuto; saveProfile(); renderMapPanel(); showToast(profile.mapAuto ? '⚡ สู้อัตโนมัติ: เปิด' : 'สู้อัตโนมัติ: ปิด'); }
+function mapToggleAuto(){ profile.mapAuto = !profile.mapAuto; saveProfile(); renderMapPanel(); showToast(profile.mapAuto ? '⚡ สู้อัตโนมัติ: เปิด' : 'สู้อัตโนมัติ: ปิด'); }
 function mapMaybeAuto(){
-  if(!profile.mapAuto || !isVip() || !battleActive) return;
+  if(!profile.mapAuto || !battleActive) return;
   if(autoTimer) clearInterval(autoTimer);
   autoOn = true; const b = document.getElementById('btnAuto'); if(b) b.textContent = 'หยุดอัตโนมัติ';
   autoTimer = setInterval(()=>{ if(!battleOver) battleStep(); else { clearInterval(autoTimer); autoTimer=null; } }, 80);
@@ -7516,7 +7536,7 @@ async function mapRespawn(){
   const lc = MAP_CITIES[p.lc] ? p.lc : 'hospital';
   profile.mapPos = { x:MAP_CITIES[lc].x, y:MAP_CITIES[lc].y, z:lc, city:true, lc };
   mapPendingEnc = null;
-  if(isOnlineMode() && ON.token) mapQueue(async ()=>{ try{ const r = await onlineRpc({ a:'mapRespawn', t:ON.token }); if(r && r.ok) profile.mapPos = r.pos; }catch(e){} });
+  if(isOnlineMode() && ON.token) mapQueue(async ()=>{ try{ const r = await onlineRpc({ a:'mapRespawn', t:ON.token }); if(r && r.ok){ profile.mapPos = r.pos; profile.mapVer = MAP_VER; } }catch(e){} });
   profile.mapRadar = null; profile.veteranUntil = 0;
   await saveProfile();
   logLine('sys', `🏥 ฟื้นคืนชีพที่${MAP_CITY_INFO[profile.mapPos.lc||lc].name} (เมืองล่าสุด)`);
@@ -7561,6 +7581,12 @@ const MAP_PALETTE = {
   ruins:      ['#8a4810','#a0561a','#6b3a10','#7a5a20','#5a3010'],
 };
 function mapNoise(x, y){ let h = (x*374761393 + y*668265263) ^ 0x5bd1e995; h = Math.imul(h ^ (h>>>13), 1274126177); h ^= h>>>16; return (h>>>0)/4294967296; }
+// ซากตึกดำ = เดินผ่านไม่ได้ (ไม่อยู่ติดเมือง) — เซิร์ฟเวอร์ใช้สูตรเดียวกัน
+function mapIsRuin(x, y){ if(mapIsCity(x,y)) return false; const c = MAP_CITIES[mapZoneOf(x,y)]; if(Math.max(Math.abs(x-c.x),Math.abs(y-c.y))<=1) return false; return mapNoise(x,y) < 0.09; }
+// จุดมอนสเตอร์: เฉพาะช่องที่มี ☠️ · สุ่มตำแหน่งใหม่ทุก MAP_MON_MS (ทุกคนเห็นเหมือนกัน)
+function mapMonWin(now){ return Math.floor((now||Date.now())/MAP_MON_MS); }
+function mapMonAt(x, y, now){ if(mapIsCity(x,y) || mapIsRuin(x,y)) return false; const w = mapMonWin(now); return mapNoise((x*17 + w*7919) % 1000003, (y*29 + w*104729) % 1000003) * 100 < MAP_MON_PCT; }
+function mapMonLeftMs(){ return (mapMonWin()+1)*MAP_MON_MS - Date.now(); }
 function mapTier(x, y){ const z = mapZoneOf(x,y), c = MAP_CITIES[z]; return 1 + Math.min(4, Math.floor(Math.max(Math.abs(x-c.x),Math.abs(y-c.y))/6)); }
 const MAP_TIER_LETTER = { hospital:'H', school:'S', campground:'C', ruins:'R' };
 const MAP_TIER_COLOR = ['', '#4caf50', '#9ccc65', '#ffd54a', '#ff8a3d', '#ff3b3b'];   // แถบสีขอบล่าง: เขียว → แดง
@@ -7573,13 +7599,14 @@ function mapCellHtml(x, y, p, size){
   const city = mapIsCity(x,y);
   const me = x===p.x && y===p.y;
   const rd = profile.mapRadar && profile.mapRadar.list ? profile.mapRadar.list.filter(o=>o.x===x && o.y===y) : [];
-  const adj = Math.abs(x-p.x)+Math.abs(y-p.y)===1;
-  const n = mapNoise(x,y), n2 = mapNoise(y+101,x+57);
+  const dist = Math.abs(x-p.x)+Math.abs(y-p.y), cheb = Math.max(Math.abs(x-p.x),Math.abs(y-p.y));
+  const adj = !mapIsRuin(x,y) && (dist===1 || (cheb===1 && isVip()));
+  const n = mapNoise(x,y);
   const pal = MAP_PALETTE[z];
   // บล็อกสีเป็นกลุ่มๆ (ใช้ noise ของช่องหยาบ 3×3) + ซากตึกดำ ~9%
   const blockN = mapNoise(Math.floor(x/3)+900, Math.floor(y/3)+700);
   let bg = pal[Math.floor(blockN*pal.length)];
-  const ruin = !city && n < 0.09;
+  const ruin = mapIsRuin(x,y);
   if(ruin) bg = n < 0.045 ? '#0b0b0b' : '#1b1b1b';
   const cls = ['mcell'];
   if(me) cls.push('me'); if(adj && !battleActive) cls.push('adj'); if(city) cls.push('city'); if(ruin) cls.push('ruin');
@@ -7591,12 +7618,12 @@ function mapCellHtml(x, y, p, size){
   let inner = '';
   const fs = Math.max(8, Math.round(size*0.36));
   if(me) inner = `<span class="mic">🧍</span>`;
-  else if(city) inner = `<span class="mlbl city">${MAP_TIER_LETTER[z]}</span>`;
+  else if(city) inner = `<span class="mcity">${MAP_CITY_INFO[z].icon}</span>`;
   else if(rd.length) inner = `<span class="mic">${rd.some(o=>o.red)?'🟥':'👤'}</span>`;
-  else if(!ruin && n2 < 0.3){ const t = mapTier(x,y); inner = `<span class="mskull">${'☠️'.repeat(MAP_TIER_SKULLS[t])}</span>`; }
+  else if(mapMonAt(x,y) && !mapCleared(x,y)){ const t = mapTier(x,y); inner = `<span class="mskull">${'☠️'.repeat(MAP_TIER_SKULLS[t])}</span>`; }
   const tier = city ? 0 : mapTier(x,y);
   if(tier) edges.push(`inset 0 -3px 0 ${MAP_TIER_COLOR[tier]}`);
-  const title = `${mapCoord(x,y)} · ` + (city ? MAP_CITY_INFO[z].name : rd.length ? rd.map(o=>`${o.n} Lv.${o.lv}${o.bounty?` 🎯${o.bounty}💎`:''}`).join(', ') : `${MAP_ZONE_NAME[z]} · อันตรายระดับ ${tier}/5`);
+  const title = `${mapCoord(x,y)} · ` + (city ? MAP_CITY_INFO[z].name : ruin ? 'ซากตึก — เดินผ่านไม่ได้' : rd.length ? rd.map(o=>`${o.n} Lv.${o.lv}${o.bounty?` 🎯${o.bounty}💎`:''}`).join(', ') : `${MAP_ZONE_NAME[z]} · อันตรายระดับ ${tier}/5`);
   return `<div class="${cls.join(' ')}" style="width:${size}px;height:${size}px;background-color:${bg};font-size:${fs}px;${edges.length?`box-shadow:${edges.join(',')};`:''}" title="${esc(title)}" ${adj?`onclick="mapStep(${x-p.x},${y-p.y})"`:''}>${inner}</div>`;
 }
 // แถบทีมบนแผนที่: เลือด + แต้มสเตตัสที่ยังไม่อัป · กดเพื่อเปิดหน้าตัวละคร (อัปสเตตัส/ใส่อุปกรณ์จากกระเป๋าได้แม้อยู่นอกเมือง)
@@ -7654,6 +7681,7 @@ function renderMapPanel(){
       <div style="display:flex;flex-direction:column;gap:4px;flex:0 0 auto;">
         <button class="ghost" onclick="mapShowMini=!mapShowMini;renderMapPanel()">🗺️ ${mapShowMini?'ซ่อน':'แผนที่รวม'}</button>
         <button class="ghost" onclick="mapShareChat()">📍 บอกพิกัดในแชท</button>
+        ${!town && isOnlineMode() && ON.token ? `<button class="ghost" onclick="onlineLogout()">🚪 ออกจากระบบ</button>` : ''}
       </div>
     </div>
     ${hint}
@@ -7664,8 +7692,8 @@ function renderMapPanel(){
       <div><button onclick="mapStep(-1,0)">◀</button><span class="note" style="margin:0 6px;">⚡${profile.stamina}</span><button onclick="mapStep(1,0)">▶</button></div>
       <button onclick="mapStep(0,1)">▼</button>
     </div>
-    <div class="row" style="justify-content:center;margin-top:4px;"><button class="${profile.mapAuto&&isVip()?'primary':'ghost'}" style="flex:0 0 auto;" onclick="mapToggleAuto()">${isVip() ? `⚡ สู้อัตโนมัติเร็ว: ${profile.mapAuto?'เปิด':'ปิด'}` : '🔒 สู้อัตโนมัติเร็ว (VIP)'}</button></div>
-    <div class="note" style="text-align:center;margin:2px 0 6px;">แตะช่องข้างตัว หรือปุ่มลูกศร (คีย์บอร์ด: ลูกศร/WASD) · 1 ช่อง = ⚡${MAP_STEP_STAMINA} = เจอศัตรู 1 ครั้ง · ช่องที่ชนะแล้วว่าง ${MAP_CLEAR_MS/60000} นาที${mapQLen?' · 🔄 ซิงก์…':''}</div>
+    <div class="row" style="justify-content:center;margin-top:4px;"><button class="${profile.mapAuto?'primary':'ghost'}" style="flex:0 0 auto;" onclick="mapToggleAuto()">⚡ สู้อัตโนมัติเร็ว: ${profile.mapAuto?'เปิด':'ปิด'}</button></div>
+    <div class="note" style="text-align:center;margin:2px 0 6px;">แตะช่องข้างตัว หรือปุ่มลูกศร (คีย์บอร์ด: ลูกศร/WASD) ${isVip()?' · 👑 VIP เดินทแยงได้ (Q/E/Z/C)':''} · ⚡${MAP_STEP_STAMINA}/ช่อง · ☠️ = มอนสเตอร์ (ย้ายที่ในอีก ${Math.ceil(mapMonLeftMs()/60000)} นาที) · ช่องที่ชนะแล้วว่าง ${MAP_CLEAR_MS/60000} นาที · ⬛ ซากตึกเดินผ่านไม่ได้${mapQLen?' · 🔄 ซิงก์…':''}</div>
     ${radarInfo}
     ${items}
     ${cityBox}
