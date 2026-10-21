@@ -338,6 +338,11 @@
     box-shadow:0 8px 20px rgba(224,168,58,.35), 0 0 0 5px var(--bg-1);
   }
   #tabnav button.fab.active .ic{ transform:scale(1.04); box-shadow:0 8px 24px rgba(224,168,58,.55), 0 0 0 5px var(--bg-1); }
+  .ptbadge{ display:inline-block; background:var(--accent); color:#1a1a1a; font-weight:800; font-size:9px; padding:0 4px; border-radius:6px; animation:ptpulse 1.6s ease-in-out infinite; }
+  @keyframes ptpulse{ 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
+  .mteam{ display:flex; gap:6px; margin:6px 0 2px; }
+  .mteam button{ flex:1 1 0; padding:5px 4px; font-size:11px; line-height:1.3; text-align:center; min-width:0; }
+  .mteam .hpbar{ margin:2px 0 0; }
   .nbadge{ position:absolute; top:0; left:calc(50% + 6px); min-width:17px; height:17px; padding:0 4px; border-radius:9px;
     background:var(--bad); color:#fff; font-size:10px; font-weight:800; display:grid; place-items:center; line-height:1; box-shadow:0 0 0 2px var(--bg-1); }
   #subnav{ position:sticky; top:-14px; z-index:4; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none;
@@ -645,7 +650,7 @@
 
   <nav id="tabnav">
     <button data-nav="gacha" class="active" onclick="goTab('gacha')"><span class="ic">🥚</span><span class="lb">สุ่ม</span></button>
-    <button data-nav="team" onclick="goTab('team')"><span class="ic">🛡️</span><span class="lb">ทีม</span></button>
+    <button data-nav="team" onclick="goTab('team')"><span class="ic">🛡️</span><span class="lb">ทีม</span><span class="nbadge" id="teamBadge" style="display:none;" title="แต้มสเตตัสที่ยังไม่ได้อัป">0</span></button>
     <button data-nav="battle" data-tab="battle" class="fab" onclick="goTab('battle')"><span class="ic">🗺️</span><span class="lb">แผนที่</span></button>
     <button data-nav="compete" onclick="goTab(lastCompete)"><span class="ic">🏆</span><span class="lb">แข่งขัน</span></button>
     <button data-nav="more" onclick="openMoreSheet()"><span class="ic">☰</span><span class="lb">เมนู</span><span class="nbadge" id="moreBadge" style="display:none;">0</span></button>
@@ -2358,6 +2363,7 @@ async function allocateStatPoint(charId, stat){
   await saveRoster();
   renderDetail();
   renderRoster();
+  if(typeof renderMapPanel==='function' && !battleActive && document.querySelector('.screen.active[data-screen="battle"]')) renderMapPanel();
 }
 // เพิ่ม EXP ให้ตัวละคร + ไล่เลเวลอัพอัตโนมัติถ้า EXP ถึงเกณฑ์ (คืนจำนวนเลเวลที่อัพได้)
 // วิวัฒนาการ: สะสมได้ไม่จำกัด — ทุก 1 ชิ้นเพิ่มเลเวลสูงสุด +5 (แยกจากผลสเตตัส)
@@ -2643,11 +2649,18 @@ function characterCardHtml(ch){
     <span class="fac-badge">${FACTIONS[ch.faction].icon}</span>
     <img src="${sprite}" alt="${ch.name}">
     <div class="cname">${ch.name}</div>
-    <div class="clvl">Lv.${ch.level}</div>
+    <div class="clvl">Lv.${ch.level}${(ch.unspentPoints||0)>0?` <span class="ptbadge" title="แต้มสเตตัสที่ยังไม่ได้อัป">✨+${ch.unspentPoints}</span>`:''}</div>
     ${hpBar}
   </div>`;
 }
+function pendingStatPoints(){ return roster.reduce((n,c)=>n+Math.max(0,c.unspentPoints||0),0); }
+function renderStatBadge(){
+  const el = document.getElementById('teamBadge'); if(!el) return;
+  const n = pendingStatPoints();
+  el.textContent = n>99 ? '99+' : n; el.style.display = n>0 ? '' : 'none';
+}
 function renderRoster(){
+  renderStatBadge();
   document.getElementById('rosterCount').textContent = roster.length;
   const grid = document.getElementById('rosterGrid');
   if(roster.length===0){
@@ -3186,6 +3199,7 @@ function openDetail(charId){
 function closeDetail(){
   document.getElementById('detailOverlay').classList.remove('show');
   detailCharId = null;
+  if(typeof renderMapPanel==='function' && !battleActive && document.querySelector('.screen.active[data-screen="battle"]')) renderMapPanel();
 }
 const TRAIT_LABEL = {human:'ATK', machine:'DEF', zombie:'พิษ', angel:'หลบ', demon:'คริ'};
 function renderDetail(){
@@ -4100,6 +4114,10 @@ async function endBattle(result){
       }
     });
     if(expBoosted){ profile.expBoostActive = false; logLine('sys', `📖 ยาคูณ EXP ถูกใช้หมดฤทธิ์แล้ว`); }
+    { const up = myFighters.filter(c=>(c.unspentPoints||0)>0);
+      if(up.length){ logLine('sys', `✨ มีแต้มสเตตัสรออัป: ${up.map(c=>`${c.name} +${c.unspentPoints}`).join(' · ')} — กดที่ตัวละครเพื่ออัป`);
+        showToast(`✨ เลเวลอัพ! มีแต้มสเตตัสรออัป ${pendingStatPoints()} แต้ม — กดตัวละครใต้แผนที่หรือแท็บทีม`); } }
+    renderStatBadge();
     await saveRoster();
 
     const dropLines = [];
@@ -7581,6 +7599,15 @@ function mapCellHtml(x, y, p, size){
   const title = `${mapCoord(x,y)} · ` + (city ? MAP_CITY_INFO[z].name : rd.length ? rd.map(o=>`${o.n} Lv.${o.lv}${o.bounty?` 🎯${o.bounty}💎`:''}`).join(', ') : `${MAP_ZONE_NAME[z]} · อันตรายระดับ ${tier}/5`);
   return `<div class="${cls.join(' ')}" style="width:${size}px;height:${size}px;background-color:${bg};font-size:${fs}px;${edges.length?`box-shadow:${edges.join(',')};`:''}" title="${esc(title)}" ${adj?`onclick="mapStep(${x-p.x},${y-p.y})"`:''}>${inner}</div>`;
 }
+// แถบทีมบนแผนที่: เลือด + แต้มสเตตัสที่ยังไม่อัป · กดเพื่อเปิดหน้าตัวละคร (อัปสเตตัส/ใส่อุปกรณ์จากกระเป๋าได้แม้อยู่นอกเมือง)
+function mapTeamStrip(){
+  const t = (profile.lockedTeamIds||[]).map(id=>roster.find(r=>r.id===id)).filter(Boolean);
+  if(!t.length) return '';
+  const pts = t.reduce((n,c)=>n+(c.unspentPoints||0),0);
+  return `<div class="mteam">${t.map(c=>{ const pct = Math.max(0, Math.round((c.currentHp??c.stats.hp)/c.stats.hp*100));
+    return `<button class="${(c.unspentPoints||0)>0?'primary':'ghost'}" onclick="openDetail('${c.id}')">${FACTIONS[c.faction].icon} ${esc(c.name)}<br>Lv.${c.level}${(c.unspentPoints||0)>0?` ✨+${c.unspentPoints}`:''}<div class="hpbar ${pct<30?'low':''}"><div style="width:${pct}%"></div></div></button>`; }).join('')}</div>
+    ${pts>0 ? `<div class="note" style="margin:0 0 4px;color:var(--accent);">✨ มีแต้มสเตตัสรออัป ${pts} แต้ม — กดที่ตัวละครเพื่ออัปสเตตัส / ใส่อุปกรณ์</div>` : ''}`;
+}
 function renderMapPanel(){
   const root = document.getElementById('mapRoot'); if(!root || !profile) return;
   const setup = document.getElementById('battleSetup'), wheel = document.getElementById('battleWheelBox');
@@ -7630,6 +7657,7 @@ function renderMapPanel(){
       </div>
     </div>
     ${hint}
+    ${mapTeamStrip()}
     <div class="mgrid" style="background-image:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.55)),url(${SCENES[STAGES[z].scene]});">${grid}</div>
     <div class="mpad">
       <button onclick="mapStep(0,-1)">▲</button>
@@ -7637,7 +7665,7 @@ function renderMapPanel(){
       <button onclick="mapStep(0,1)">▼</button>
     </div>
     <div class="row" style="justify-content:center;margin-top:4px;"><button class="${profile.mapAuto&&isVip()?'primary':'ghost'}" style="flex:0 0 auto;" onclick="mapToggleAuto()">${isVip() ? `⚡ สู้อัตโนมัติเร็ว: ${profile.mapAuto?'เปิด':'ปิด'}` : '🔒 สู้อัตโนมัติเร็ว (VIP)'}</button></div>
-    <div class="note" style="text-align:center;margin:2px 0 6px;">แตะช่องข้างตัว หรือปุ่มลูกศร (คีย์บอร์ด: ลูกศร/WASD) · 1 ช่อง = ⚡1 = เจอศัตรู 1 ครั้ง · ช่องที่ชนะแล้วว่าง 5 นาที${mapQLen?' · 🔄 ซิงก์…':''}</div>
+    <div class="note" style="text-align:center;margin:2px 0 6px;">แตะช่องข้างตัว หรือปุ่มลูกศร (คีย์บอร์ด: ลูกศร/WASD) · 1 ช่อง = ⚡${MAP_STEP_STAMINA} = เจอศัตรู 1 ครั้ง · ช่องที่ชนะแล้วว่าง ${MAP_CLEAR_MS/60000} นาที${mapQLen?' · 🔄 ซิงก์…':''}</div>
     ${radarInfo}
     ${items}
     ${cityBox}
@@ -7661,7 +7689,7 @@ function mapMiniHtml(p){
 
 // ---------- นอกเมือง: ล็อกเมนูอื่น ----------
 const MAP_OUT_TABS = ['battle','team','bag','rank'];
-const MAP_OUT_FUNCS = new Set(['discardItem','useHealPotion','useSupplies','useExpPotion','useDropPotion','openMoneyBox','allocateStatPoint',
+const MAP_OUT_FUNCS = new Set(['equipGear','unequipGear','discardItem','useHealPotion','useSupplies','useExpPotion','useDropPotion','openMoneyBox','allocateStatPoint',
   'vetBuyDnaBox','vetBuyRadar','vetMoneyBoxService','vetBuyGold','vetDonate','vetSellGold','claimQuest','useVipBox','openDnaBox']);
 function mapTownBlocked(name){
   if(typeof profile==='undefined' || !profile || inTown()) return false;
