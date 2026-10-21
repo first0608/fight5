@@ -197,6 +197,10 @@
   .mlbl{ font-family:Georgia,'Times New Roman',serif; font-weight:700; letter-spacing:-.5px; color:#fff; text-shadow:0 0 2px #000, 0 0 2px #000; }
   .mlbl.t1,.mlbl.t2{ color:#7dff7d; } .mlbl.t3{ color:#fff; } .mlbl.t4{ color:#ffd166; } .mlbl.t5{ color:#ff7b7b; }
   .mlbl.city{ color:#9dffad; font-size:1.25em; }
+  .mskull{ font-size:.62em; letter-spacing:-2px; line-height:1; filter:drop-shadow(0 0 1px #000); margin-top:-3px; }
+  .maxis{ display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#bbb; background:rgba(0,0,0,.55); font-family:Georgia,serif; }
+  .maxis.on{ color:#ff6b6b; background:rgba(120,0,0,.6); }
+  .maxis.corner{ background:transparent; }
   .mpad{ display:flex; flex-direction:column; align-items:center; gap:4px; margin-top:6px; }
   .mpad > div{ display:flex; align-items:center; }
   .mpad button{ width:52px; height:40px; font-size:18px; padding:0; }
@@ -1452,6 +1456,8 @@ function renderGuide(){
 
   secs.push(gSec('🗺️ แผนที่โลก (เดินทีละช่อง)', `
     • แผนที่ ${MAP_W}×${MAP_H} ช่อง แบ่ง 4 โซน: ↖️ โรงพยาบาล · ↗️ ค่ายทหาร · ↙️ โรงเรียน · ↘️ ซากเมือง — แต่ละโซนมีเมือง 1 แห่ง (${Object.keys(MAP_CITY_INFO).map(k=>MAP_CITY_INFO[k].icon+' '+MAP_CITY_INFO[k].name).join(' · ')})<br>
+    • 📍 พิกัดตาราง: คอลัมน์ A–${mapColName(MAP_W-1)} (ซ้าย→ขวา) · แถว 1–${MAP_H} (บน→ล่าง) เช่น B5 — กดปุ่ม "บอกพิกัดในแชท" เพื่อบอกเพื่อนตอนเจอบอส<br>
+    • ☠️ ความอันตราย: แถบสีขอบล่างช่อง เขียว → เหลือง → แดง (ระดับ 1–5 ยิ่งห่างเมืองยิ่งแรง) และหัวกะโหลก ☠️ 1–3 หัว<br>
     • เดินบน/ล่าง/ซ้าย/ขวา ทีละ 1 ช่อง = ⚡1 และเจอศัตรู 1 ครั้งทุกช่อง · ช่องที่ชนะแล้วจะว่าง ${MAP_CLEAR_MS/60000} นาที · ยิ่งห่างเมืองศัตรูยิ่งเลเวล/เกรดสูง<br>
     • โซนยากมอนสเตอร์ติด DNA และชิ้นส่วน: โรงเรียน DNA ${MAP_ENEMY_GEAR.school.dna*100}% · ค่ายทหาร ${MAP_ENEMY_GEAR.campground.dna*100}% (ชิ้นส่วน ${MAP_ENEMY_GEAR.campground.parts.join('–')}) · ซากเมือง ${MAP_ENEMY_GEAR.ruins.dna*100}% (ชิ้นส่วน ${MAP_ENEMY_GEAR.ruins.parts.join('–')})<br>
     • 🏙️ <b>นอกเมืองใช้ได้แค่ของในกระเป๋า</b> (น้ำยา เสบียง เรดาห์ ยา) — ตลาด ร้านค้า ตู้เซฟ คลังเพชร กิล อารีน่า บอสโลก หอคอย ใช้ได้เฉพาะในเมือง · พกน้ำยาไปเยอะๆ<br>
@@ -3470,8 +3476,8 @@ function startBattle(diff, opts){
   document.getElementById('battleLog').innerHTML='';
   if(isMap){
     const pp = mapPos();
-    if(opts.map.boss) logLine('sys', `👑 เจอบอสโซน "${MAP_BOSS_INFO[diff].name}" ที่ (${pp.x},${pp.y})! ปราบได้รับรางวัลพิเศษ`);
-    else logLine('sys', `⚔️ เจอศัตรูที่${MAP_ZONE_NAME[diff]} (${pp.x},${pp.y})${enemyChars.some(c=>c.dna&&c.dna.length)?' — บางตัวติด DNA!':''}`);
+    if(opts.map.boss) logLine('sys', `👑 เจอบอสโซน "${MAP_BOSS_INFO[diff].name}" ที่ช่อง ${mapCoord(pp.x,pp.y)}! ปราบได้รับรางวัลพิเศษ`);
+    else logLine('sys', `⚔️ เจอศัตรูที่${MAP_ZONE_NAME[diff]} ช่อง ${mapCoord(pp.x,pp.y)}${enemyChars.some(c=>c.dna&&c.dna.length)?' — บางตัวติด DNA!':''}`);
   } else logLine('sys', `เริ่มต่อสู้ที่ ${STAGES[diff].name}! ${STAGES[diff].phases>1?`(ทั้งหมด ${STAGES[diff].phases} เฟส)`:''}`);
   if(isMap) setTimeout(mapMaybeAuto, 0);
   if(battleGuildBonus) logLine('sys', `🏰 สู้ในเขตกิลเรา: ATK +${battleGuildBonus.atk} · หลบ +${battleGuildBonus.eva}% · DEF +${battleGuildBonus.def}`);
@@ -7217,7 +7223,7 @@ function mapAfterServer(r, x, y){
   }
   const atHere = profile.mapPos.x===x && profile.mapPos.y===y;
   if(atHere){ mapHints = r.hints || { howl:false, car:false }; if(r.pos) profile.mapPos.lc = r.pos.lc; }
-  if(atHere && mapHints.howl) showToast('🔊 ได้ยินเสียงโหยหวน… มีบอสอยู่ติดๆ แถวนี้!');
+  if(atHere && mapHints.howl) showToast(`🔊 ได้ยินเสียงโหยหวนแถว ${mapCoord(x,y)}… มีบอสอยู่ติดๆ ช่องรอบตัว!`);
   else if(atHere && mapHints.car) showToast('🚚 ได้ยินเสียงรถ… น่าจะมีคนอยู่แถวนี้');
   const enc = r.enc;
   if(enc && (enc.type==='vet' || enc.type==='boss' || enc.type==='pvp')){
@@ -7253,6 +7259,15 @@ document.addEventListener('keydown', e=>{
   const d = { arrowup:[0,-1], w:[0,-1], arrowdown:[0,1], s:[0,1], arrowleft:[-1,0], a:[-1,0], arrowright:[1,0], d:[1,0] }[k];
   if(d){ e.preventDefault(); mapStep(d[0], d[1]); }
 });
+// 📍 บอกพิกัดในแชทโลก (เติมข้อความให้ แก้ไขก่อนส่งได้)
+function mapShareChat(){
+  const p = mapPos();
+  const where = p.city ? `${MAP_CITY_INFO[p.z].name}` : MAP_ZONE_NAME[p.z];
+  const extra = mapHints.howl ? ' 🔊 ได้ยินเสียงบอสแถวนี้!' : mapHints.car ? ' 🚚 ทหารผ่านศึกอยู่แถวนี้' : '';
+  if(chat) chat.ch = 'all';
+  openChat();
+  setTimeout(()=>{ const i = document.getElementById('chatInput'); if(i){ i.value = `📍 ${mapCoord(p.x,p.y)} (${where})${extra} `; i.focus(); } }, 200);
+}
 // ⚡ สู้อัตโนมัติบนแผนที่: ตีเร็วอัตโนมัติ ชนะแล้วปิดหน้าต่อสู้กลับแผนที่เอง
 function mapToggleAuto(){ profile.mapAuto = !profile.mapAuto; saveProfile(); renderMapPanel(); showToast(profile.mapAuto ? '⚡ สู้อัตโนมัติ: เปิด' : 'สู้อัตโนมัติ: ปิด'); }
 function mapMaybeAuto(){
@@ -7314,6 +7329,11 @@ const MAP_PALETTE = {
 function mapNoise(x, y){ let h = (x*374761393 + y*668265263) ^ 0x5bd1e995; h = Math.imul(h ^ (h>>>13), 1274126177); h ^= h>>>16; return (h>>>0)/4294967296; }
 function mapTier(x, y){ const z = mapZoneOf(x,y), c = MAP_CITIES[z]; return 1 + Math.min(4, Math.floor(Math.max(Math.abs(x-c.x),Math.abs(y-c.y))/6)); }
 const MAP_TIER_LETTER = { hospital:'H', school:'S', campground:'C', ruins:'R' };
+const MAP_TIER_COLOR = ['', '#4caf50', '#9ccc65', '#ffd54a', '#ff8a3d', '#ff3b3b'];   // แถบสีขอบล่าง: เขียว → แดง
+const MAP_TIER_SKULLS = [0, 1, 1, 2, 3, 3];   // จำนวน ☠️ ตามระดับ
+// พิกัดตาราง: คอลัมน์ A, B, … Z, AA, AB … (ซ้าย→ขวา) · แถว 1–60 (บน→ล่าง) เช่น B5
+function mapColName(x){ let n = x+1, s = ''; while(n>0){ const r = (n-1)%26; s = String.fromCharCode(65+r) + s; n = Math.floor((n-1)/26); } return s; }
+function mapCoord(x, y){ return mapColName(x) + (y+1); }
 function mapCellHtml(x, y, p, size){
   const z = mapZoneOf(x,y);
   const city = mapIsCity(x,y);
@@ -7339,8 +7359,10 @@ function mapCellHtml(x, y, p, size){
   if(me) inner = `<span class="mic">🧍</span>`;
   else if(city) inner = `<span class="mlbl city">${MAP_TIER_LETTER[z]}</span>`;
   else if(rd.length) inner = `<span class="mic">${rd.some(o=>o.red)?'🟥':'👤'}</span>`;
-  else if(!ruin && n2 < 0.3){ const t = mapTier(x,y); inner = `<span class="mlbl t${t}">${MAP_TIER_LETTER[z]}${t}</span>`; }
-  const title = city ? MAP_CITY_INFO[z].name : rd.length ? rd.map(o=>`${o.n} Lv.${o.lv}${o.bounty?` 🎯${o.bounty}💎`:''}`).join(', ') : `${MAP_ZONE_NAME[z]} (${x},${y}) · ระดับอันตราย ${mapTier(x,y)}`;
+  else if(!ruin && n2 < 0.3){ const t = mapTier(x,y); inner = `<span class="mskull">${'☠️'.repeat(MAP_TIER_SKULLS[t])}</span>`; }
+  const tier = city ? 0 : mapTier(x,y);
+  if(tier) edges.push(`inset 0 -3px 0 ${MAP_TIER_COLOR[tier]}`);
+  const title = `${mapCoord(x,y)} · ` + (city ? MAP_CITY_INFO[z].name : rd.length ? rd.map(o=>`${o.n} Lv.${o.lv}${o.bounty?` 🎯${o.bounty}💎`:''}`).join(', ') : `${MAP_ZONE_NAME[z]} · อันตรายระดับ ${tier}/5`);
   return `<div class="${cls.join(' ')}" style="width:${size}px;height:${size}px;background-color:${bg};font-size:${fs}px;${edges.length?`box-shadow:${edges.join(',')};`:''}" title="${esc(title)}" ${adj?`onclick="mapStep(${x-p.x},${y-p.y})"`:''}>${inner}</div>`;
 }
 function renderMapPanel(){
@@ -7356,13 +7378,20 @@ function renderMapPanel(){
   const half = Math.floor(MAP_VIEW/2);
   const x0 = Math.max(0, Math.min(MAP_W-MAP_VIEW, p.x-half)), y0 = Math.max(0, Math.min(MAP_H-MAP_VIEW, p.y-half));
   const width = Math.min(root.clientWidth || 340, 520);
-  const size = Math.max(20, Math.floor((width-6)/MAP_VIEW) - 1);
-  let grid = '';
-  for(let y=y0; y<y0+MAP_VIEW; y++){ grid += '<div class="mrow">'; for(let x=x0; x<x0+MAP_VIEW; x++) grid += mapCellHtml(x,y,p,size); grid += '</div>'; }
+  const size = Math.max(19, Math.floor((width-26)/MAP_VIEW) - 1);
+  const ax = Math.max(16, Math.round(size*0.7));
+  let grid = `<div class="mrow"><div class="maxis corner" style="width:${ax}px;height:${ax}px;"></div>`;
+  for(let x=x0; x<x0+MAP_VIEW; x++) grid += `<div class="maxis ${x===p.x?'on':''}" style="width:${size}px;height:${ax}px;">${mapColName(x)}</div>`;
+  grid += '</div>';
+  for(let y=y0; y<y0+MAP_VIEW; y++){
+    grid += `<div class="mrow"><div class="maxis ${y===p.y?'on':''}" style="width:${ax}px;height:${size}px;">${y+1}</div>`;
+    for(let x=x0; x<x0+MAP_VIEW; x++) grid += mapCellHtml(x,y,p,size);
+    grid += '</div>';
+  }
   const zo = (typeof guildState!=='undefined' && guildState.zoneOwners) ? guildState.zoneOwners[z] : null;
   const hint = mapHints.howl ? '<div class="mhint howl">🔊 ได้ยินเสียงโหยหวน… มีบอสอยู่ในระยะ 3×3 ช่องรอบตัว!</div>' : mapHints.car ? '<div class="mhint car">🚚 ได้ยินเสียงรถ… น่าจะมีคนอยู่แถวนี้ (ทหารผ่านศึก)</div>' : '';
   const rd = profile.mapRadar;
-  const radarInfo = rd ? `<div class="note" style="margin:4px 0;">📡 เรดาห์${MAP_ZONE_NAME[rd.zone]}: ${rd.list.length ? rd.list.map(o=>`${o.red?'🟥':''}${esc(o.n)} Lv.${o.lv} (${o.x},${o.y})${o.bounty?` 🎯${o.bounty}💎`:''}${o.shield?' 🛡️':''}`).join(' · ') : 'ไม่พบผู้เล่น'} — เหลือ ${rd.steps} ก้าว</div>` : '';
+  const radarInfo = rd ? `<div class="note" style="margin:4px 0;">📡 เรดาห์${MAP_ZONE_NAME[rd.zone]}: ${rd.list.length ? rd.list.map(o=>`${o.red?'🟥':''}${esc(o.n)} Lv.${o.lv} 📍${mapCoord(o.x,o.y)}${o.bounty?` 🎯${o.bounty}💎`:''}${o.shield?' 🛡️':''}`).join(' · ') : 'ไม่พบผู้เล่น'} — เหลือ ${rd.steps} ก้าว</div>` : '';
   const pvpZone = MAP_PVP_ZONES.includes(z);
   const items = `<div class="mitems">
       <button class="primary" onclick="openHealPicker()">🧪 น้ำยา (${usableQty('heal_potion')})</button>
@@ -7377,9 +7406,12 @@ function renderMapPanel(){
   const mini = mapShowMini ? mapMiniHtml(p) : '';
   root.innerHTML = `
     <div class="mhead">
-      <div><b>${town ? MAP_CITY_INFO[z].icon+' '+MAP_CITY_INFO[z].name : MAP_ZONE_NAME[z]}</b> <span class="note" style="margin:0;">(${p.x},${p.y}) · Lv.${STAGE_LEVELS[z][0]}–${STAGE_LEVELS[z][1]+(MAP_BOSS_INFO[z].lv>STAGE_LEVELS[z][1]?'':'')}${pvpZone?' · ⚔️ PVP':' · 🕊️ ไม่มี PVP'}</span>
+      <div><b>${town ? MAP_CITY_INFO[z].icon+' '+MAP_CITY_INFO[z].name : MAP_ZONE_NAME[z]}</b> <span class="note" style="margin:0;">📍 <b style="color:#fff;">${mapCoord(p.x,p.y)}</b> · Lv.${STAGE_LEVELS[z][0]}–${STAGE_LEVELS[z][1]+(MAP_BOSS_INFO[z].lv>STAGE_LEVELS[z][1]?'':'')}${pvpZone?' · ⚔️ PVP':' · 🕊️ ไม่มี PVP'}</span>
         ${zo && zo.gid ? `<div class="note" style="margin:0;">👑 ครองโดย ${esc(zo.gname)}${zo.gid===profile.guildId?' (กิลเรา)':' · เสียภาษี'}</div>` : ''}</div>
-      <button class="ghost" style="flex:0 0 auto;" onclick="mapShowMini=!mapShowMini;renderMapPanel()">🗺️ ${mapShowMini?'ซ่อน':'แผนที่รวม'}</button>
+      <div style="display:flex;flex-direction:column;gap:4px;flex:0 0 auto;">
+        <button class="ghost" onclick="mapShowMini=!mapShowMini;renderMapPanel()">🗺️ ${mapShowMini?'ซ่อน':'แผนที่รวม'}</button>
+        <button class="ghost" onclick="mapShareChat()">📍 บอกพิกัดในแชท</button>
+      </div>
     </div>
     ${hint}
     <div class="mgrid" style="background-image:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.55)),url(${SCENES[STAGES[z].scene]});">${grid}</div>
@@ -7408,7 +7440,7 @@ function mapMiniHtml(p){
     h += `<div style="width:${s}px;height:${s}px;background:${me?'#fff':city?'#ffd54a':(nn<0.09?'#111':MAP_PALETTE[zz][Math.floor(bn*5)])};"></div>`;
   } h += '</div>'; }
   return `<div class="panel" style="margin-top:8px;padding:8px;"><div class="note" style="margin:0 0 4px;">แผนที่รวม ${MAP_W}×${MAP_H} · ⬜ คุณ · 🟨 เมือง</div><div class="mmini">${h}</div>
-    <div class="note">${Object.keys(MAP_CITY_INFO).map(k=>`${MAP_CITY_INFO[k].icon} ${MAP_CITY_INFO[k].name} (${MAP_CITIES[k].x},${MAP_CITIES[k].y})`).join(' · ')}</div></div>`;
+    <div class="note">${Object.keys(MAP_CITY_INFO).map(k=>`${MAP_CITY_INFO[k].icon} ${MAP_CITY_INFO[k].name} (${mapCoord(MAP_CITIES[k].x,MAP_CITIES[k].y)})`).join(' · ')}</div></div>`;
 }
 
 // ---------- นอกเมือง: ล็อกเมนูอื่น ----------
