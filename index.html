@@ -558,7 +558,7 @@
         <div class="row" style="margin-top:10px;">
           <button class="primary" id="btnStep" onclick="battleStep()">ตีต่อ ▶</button>
           <button class="ghost" id="btnAuto" onclick="toggleAutoBattle()">อัตโนมัติ</button>
-          <button class="diamond" id="btnInstant" onclick="instantBattle()" title="แพ็ค VIP">⚡ จบทันที</button>
+          <button class="diamond" id="btnInstant" onclick="fastBattle()" title="แพ็ค VIP">⚡ อัตโนมัติเร็ว</button>
           <button class="primary" id="btnModeNext" style="display:none;" onclick="modeNextClick()">▶ ต่อ</button>
           <button class="ghost" onclick="closeBattle()">ออก</button>
         </div>
@@ -1473,7 +1473,7 @@ function renderGuide(){
     ${gTable(['โซน','เลเวลมอน','เกรดศัตรู','เหรียญ','EXP'], Object.entries(STAGES).filter(([k,st])=>!st.isBoss).map(([k,st])=>[MAP_ZONE_NAME[k], stageLvText(k), st.grades.join('–'), `${st.coinRange[0]}–${st.coinRange[1]}`, st.expReward]))}
     • มอนสเตอร์มีเลเวลตามด่าน สเตตัสโตต่อเลเวล HP +${ENEMY_LV_GROWTH.hp*100}% · ATK +${ENEMY_LV_GROWTH.atk*100}% · DEF +${ENEMY_LV_GROWTH.def*100}% · SPD +${ENEMY_LV_GROWTH.spd*100}%<br>
     • ตัวละครเลเวลเกินมอนสูงสุดของด่านเกิน ${EXP_OVERLEVEL_FREE} เลเวล ได้ EXP ลดลง ${EXP_OVERLEVEL_STEP*100}% ต่อเลเวล (เหลืออย่างน้อย 10%)<br>
-    • 👑 แพ็ค VIP (${VIP_PRICE}💎/${VIP_DAYS} วัน): ปุ่ม ⚡ จบทันที คำนวณการต่อสู้จนจบในครั้งเดียว<br>
+    • 👑 แพ็ค VIP (${VIP_PRICE}💎/${VIP_DAYS} วัน): ⚡ สู้อัตโนมัติเร็ว (ตีเองเร็ว ~6 เท่า · บนแผนที่ชนะแล้วกลับแผนที่ให้เอง)<br>
     • ทุกรอบเรียงลำดับตาม SPD สูงตีก่อน · เลือดต่อเนื่องจากไฟต์ก่อน (ไม่ฟื้นเอง ต้องใช้น้ำยา)<br>
     • คริติคอลสูงสุด 70% (เกินจะเพิ่มแรงคริแทน) · หลบสูงสุด 70% (เกินจะสวนกลับ) · DEF% สูงสุด 80% (เกินจะสะท้อนดาเมจ)<br>
     • พิษ: เสียเลือดตามเปอร์เซ็นต์ทุกเทิร์น และ ATK -10% ระหว่างติดพิษ<br>
@@ -4044,7 +4044,7 @@ async function endBattle(result){
     logLine('sys', `⚖️ เสมอ`);
   }
   document.getElementById('btnStep').disabled = true;
-  if(mb && result==='win' && profile.mapAuto) setTimeout(()=>{ if(battleActive && battleOver && !pvpBattle && !modeBattle && !warBattle) closeBattle(); }, 700);
+  if(mb && result==='win' && profile.mapAuto && isVip()) setTimeout(()=>{ if(battleActive && battleOver && !pvpBattle && !modeBattle && !warBattle) closeBattle(); }, 700);
 }
 
 // advances exactly one actor's turn
@@ -5446,7 +5446,7 @@ async function vaultWithdraw(){
 }
 
 // =====================================================================
-// 👑 แพ็ค VIP — 1500 เพชร / 30 วัน · ปุ่ม "⚡ จบทันที" คำนวณการต่อสู้จนจบในครั้งเดียว
+// 👑 แพ็ค VIP — 1500 เพชร / 30 วัน · ⚡ สู้อัตโนมัติเร็ว
 // =====================================================================
 const VIP_PRICE = 1500, VIP_DAYS = 30;
 function isVip(){ return (profile && profile.vipUntil||0) > Date.now(); }
@@ -5455,7 +5455,7 @@ function renderVipPanel(){
   const el = document.getElementById('vipPanel'); if(!el || !profile) return;
   const on = isVip();
   el.innerHTML = `<h2>👑 แพ็ค VIP</h2>
-    <div class="note">สิทธิ์ VIP: <b>⚡ จบทันที</b> ในหน้าต่อสู้ · 🔒 ล็อกของที่สวมใส่ 1 ชิ้น · 🏦 ฝาก/ถอนคลังเพชรได้วันละ ${VAULT_DAILY_LIMIT_VIP} (ปกติ ${VAULT_DAILY_LIMIT})</div>
+    <div class="note">สิทธิ์ VIP: <b>⚡ สู้อัตโนมัติเร็ว</b> (ทุกไฟต์ + เปิดค้างบนแผนที่ได้) · 🔒 ล็อกของที่สวมใส่ 1 ชิ้น · 🏦 ฝาก/ถอนคลังเพชรได้วันละ ${VAULT_DAILY_LIMIT_VIP} (ปกติ ${VAULT_DAILY_LIMIT})</div>
     <div class="part-pick-item"><div>${on ? `✅ VIP ใช้งานอยู่ ถึง <b>${fmtThDate(profile.vipUntil)}</b>` : 'ยังไม่ได้เป็น VIP'}<div class="note" style="margin:2px 0 0;">${VIP_PRICE}💎 / ${VIP_DAYS} วัน · ซื้อซ้ำ = ต่ออายุเพิ่ม ${VIP_DAYS} วัน</div></div>
       <button class="diamond" onclick="buyVip()" ${profile.diamonds<VIP_PRICE?'disabled':''}>${on?'ต่ออายุ':'ซื้อ'} · ${VIP_PRICE}💎</button></div>
     <div class="note" style="margin-top:8px;">🔒 <b>ล็อกของที่สวมใส่ 1 ชิ้น</b> (DNA ที่ติดตั้ง / ชิ้นส่วนอวัยวะ / อุปกรณ์) — ชิ้นที่ล็อกจะไม่ตกเมื่อแพ้ยกทีมหรือโดนดัก${on?'':' (เฉพาะ VIP)'}</div>
@@ -5464,7 +5464,7 @@ function renderVipPanel(){
       return `<select style="width:100%;margin-top:4px;" onchange="setVipLock(this.value)"><option value="">— ไม่ล็อก —</option>${opts.map(o=>`<option value="${o.key}" ${o.key===cur?'selected':''}>${esc(o.label)}</option>`).join('')}</select>
         ${cur && !valid ? '<div class="note">⚠️ ของที่เคยล็อกไม่ได้สวมอยู่แล้ว เลือกใหม่ได้</div>' : ''}`; })() : ''}`;
   const b = document.getElementById('btnInstant');
-  if(b) b.textContent = on ? '⚡ จบทันที' : '🔒 จบทันที (VIP)';
+  if(b) b.textContent = on ? '⚡ อัตโนมัติเร็ว' : '🔒 อัตโนมัติเร็ว (VIP)';
 }
 async function buyVip(){
   if(profile.diamonds < VIP_PRICE){ showToast('เพชรไม่พอ'); return; }
@@ -5474,14 +5474,15 @@ async function buyVip(){
   renderAll();
   showToast(`👑 เป็น VIP ถึง ${fmtThDate(profile.vipUntil)}`);
 }
-function instantBattle(){
-  if(!isVip()){ showToast('ฟังก์ชันนี้สำหรับแพ็ค VIP — ซื้อได้ที่แท็บ 🏪 ตลาด'); return; }
+// ⚡ สู้อัตโนมัติเร็ว (VIP) — ตีเองทีละเทิร์นเร็วๆ ให้เห็นการต่อสู้ (แทนปุ่มจบทันทีแบบเดิม)
+function fastBattle(){
+  if(!isVip()){ showToast('👑 สู้อัตโนมัติเร็ว สำหรับแพ็ค VIP — ซื้อได้ที่แท็บ 🏪 ตลาด'); return; }
   if(!battleActive || battleOver) return;
-  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
-  autoOn = false; document.getElementById('btnAuto').textContent = 'อัตโนมัติ';
-  let n = 0;
-  while(!battleOver && n < 20000){ battleStep(); n++; }
+  if(autoTimer) clearInterval(autoTimer);
+  autoOn = true; document.getElementById('btnAuto').textContent = 'หยุดอัตโนมัติ';
+  autoTimer = setInterval(()=>{ if(!battleOver) battleStep(); else { clearInterval(autoTimer); autoTimer=null; } }, 80);
 }
+const instantBattle = fastBattle;
 
 // =====================================================================
 // 📦 กล่องเก็บเงิน — ซื้อ 100 เพชร เปิดได้ 5,000 เหรียญ (ขายในตลาดผู้เล่นได้)
@@ -7269,9 +7270,9 @@ function mapShareChat(){
   setTimeout(()=>{ const i = document.getElementById('chatInput'); if(i){ i.value = `📍 ${mapCoord(p.x,p.y)} (${where})${extra} `; i.focus(); } }, 200);
 }
 // ⚡ สู้อัตโนมัติบนแผนที่: ตีเร็วอัตโนมัติ ชนะแล้วปิดหน้าต่อสู้กลับแผนที่เอง
-function mapToggleAuto(){ profile.mapAuto = !profile.mapAuto; saveProfile(); renderMapPanel(); showToast(profile.mapAuto ? '⚡ สู้อัตโนมัติ: เปิด' : 'สู้อัตโนมัติ: ปิด'); }
+function mapToggleAuto(){ if(!isVip()){ showToast('👑 สู้อัตโนมัติเร็ว สำหรับแพ็ค VIP — ซื้อได้ที่แท็บ 🏪 ตลาด'); return; } profile.mapAuto = !profile.mapAuto; saveProfile(); renderMapPanel(); showToast(profile.mapAuto ? '⚡ สู้อัตโนมัติ: เปิด' : 'สู้อัตโนมัติ: ปิด'); }
 function mapMaybeAuto(){
-  if(!profile.mapAuto || !battleActive) return;
+  if(!profile.mapAuto || !isVip() || !battleActive) return;
   if(autoTimer) clearInterval(autoTimer);
   autoOn = true; const b = document.getElementById('btnAuto'); if(b) b.textContent = 'หยุดอัตโนมัติ';
   autoTimer = setInterval(()=>{ if(!battleOver) battleStep(); else { clearInterval(autoTimer); autoTimer=null; } }, 80);
@@ -7420,7 +7421,7 @@ function renderMapPanel(){
       <div><button onclick="mapStep(-1,0)">◀</button><span class="note" style="margin:0 6px;">⚡${profile.stamina}</span><button onclick="mapStep(1,0)">▶</button></div>
       <button onclick="mapStep(0,1)">▼</button>
     </div>
-    <div class="row" style="justify-content:center;margin-top:4px;"><button class="${profile.mapAuto?'primary':'ghost'}" style="flex:0 0 auto;" onclick="mapToggleAuto()">⚡ สู้อัตโนมัติเร็ว: ${profile.mapAuto?'เปิด':'ปิด'}</button></div>
+    <div class="row" style="justify-content:center;margin-top:4px;"><button class="${profile.mapAuto&&isVip()?'primary':'ghost'}" style="flex:0 0 auto;" onclick="mapToggleAuto()">${isVip() ? `⚡ สู้อัตโนมัติเร็ว: ${profile.mapAuto?'เปิด':'ปิด'}` : '🔒 สู้อัตโนมัติเร็ว (VIP)'}</button></div>
     <div class="note" style="text-align:center;margin:2px 0 6px;">แตะช่องข้างตัว หรือปุ่มลูกศร (คีย์บอร์ด: ลูกศร/WASD) · 1 ช่อง = ⚡1 = เจอศัตรู 1 ครั้ง · ช่องที่ชนะแล้วว่าง 5 นาที${mapQLen?' · 🔄 ซิงก์…':''}</div>
     ${radarInfo}
     ${items}
