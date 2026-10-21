@@ -1000,13 +1000,15 @@ function dcLinkStart(){
   if(ON.pendingPriv.size) onlineFlush();
   location.href = DC_BASE + '/login?mode=link&ret=' + encodeURIComponent(location.href.split('#')[0]);
 }
-function dcLoadSdk(){
+async function dcLoadSdk(){
   // ฝัง Discord SDK ไว้ในหน้าเกมเลย (ไม่โหลดไฟล์แยก — กันปัญหาแคช/พร็อกซีของ Discord)
-  if(typeof window.DiscordSDK === 'function') return Promise.resolve();
+  if(typeof window.DiscordSDK === 'function') return;
+  // บล็อก SDK อยู่ท้ายหน้า — รอให้หน้าโหลดครบก่อน
+  if(!document.getElementById('dcSdkCode') && document.readyState === 'loading') await new Promise(r=>document.addEventListener('DOMContentLoaded', r, { once:true }));
   const el = document.getElementById('dcSdkCode');
-  if(!el) return Promise.reject(new Error('ไม่พบ Discord SDK ในหน้าเกม'));
+  if(!el) throw new Error('ไม่พบ Discord SDK ในหน้าเกม');
   const sc = document.createElement('script'); sc.textContent = el.textContent; document.head.appendChild(sc);
-  return typeof window.DiscordSDK === 'function' ? Promise.resolve() : Promise.reject(new Error('โหลด Discord SDK ไม่สำเร็จ'));
+  if(typeof window.DiscordSDK !== 'function') throw new Error('โหลด Discord SDK ไม่สำเร็จ');
 }
 // หา path ที่ใช้เรียก Worker ได้ใน Activity (/.proxy/api หรือ /api)
 async function dcProbeBase(){
