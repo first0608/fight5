@@ -1391,6 +1391,7 @@ function devTerrHtml(){
     <div style="font-size:12px;line-height:1.6;">${me ? `กิล <b>${esc(me.name)}</b> Lv.${me.lv} · ธง ${me.flags}/${me.max} · ค่าย ${me.camp?mapCoord(me.camp.x,me.camp.y):'—'}<br>คลังวัสดุ 🧱 ${me.mat?me.mat.c:0} · 🔩 ${me.mat?me.mat.r:0} · ค่าบำรุง/วัน 🧱 ${me.upkeep?me.upkeep.c:0} · 🔩 ${me.upkeep?me.upkeep.r:0}` : '⚠️ ยังไม่อยู่ในกิล (สร้าง/เข้ากิลก่อน)'}<br>
       ยืนอยู่ ${mapCoord(p.x,p.y)} ${f ? `· ${f.t==='camp'?'⛺':'🚩'} ${esc(f.gn)} ❤️${f.hp}/${f.max}${terrDone(f)?'':' (กำลังสร้าง)'}${f.imm>terrNow()?' 🛡️อมตะ':''}` : p.city ? '(ในเมือง)' : '(ช่องว่าง)'}</div>
     <div style="margin-top:6px;font-weight:700;font-size:12px;">วาง (เสร็จทันที ไม่หักวัสดุ ไม่เช็กกติกาต่อธง) ที่ช่องที่ยืน</div>
+    ${b(`🏙️ ใช้เมนู/ปุ่มในเมืองได้นอกเมือง: ${DEV.anyTown?'เปิด':'ปิด'}`,"devDo('anyTown')", DEV.anyTown?'primary':'')}<br>
     ${b('⛺ ค่ายกิลเรา',"devTerrDo('placeMine','camp')")}${b('🚩 ธงกิลเรา',"devTerrDo('placeMine','flag')")}
     ${b('🧪⛺ ค่ายกิลทดสอบ (ศัตรู)',"devTerrDo('placeEnemy','camp')")}${b('🧪🚩 ธงกิลทดสอบ (ศัตรู)',"devTerrDo('placeEnemy','flag')")}
     <div style="margin-top:6px;font-weight:700;font-size:12px;">เวลา · เลือด</div>
@@ -1400,6 +1401,8 @@ function devTerrHtml(){
     ${b('🧱 +200 ปูน/เหล็กเส้น เข้ากระเป๋า',"devDo('terrBag')")}${b('🏦 +1,000 เข้าคลังวัสดุกิล',"devTerrDo('mat')")}${b('0️⃣ ล้างคลังวัสดุกิล',"devTerrDo('matZero')")}
     ${b('📅 เก็บค่าบำรุง 1 วันตอนนี้',"devTerrDo('upkeep')")}${b('🏆 +แต้มครอบครอง 1 ชม.',"devTerrDo('pts')")}${b('🌀 รีเซ็ตคูลดาวน์วาร์ป',"devTerrDo('warpReset')")}
     ${b('📖 +1,000 EXP กิล',"devDo('gexp')")}
+    <div style="margin-top:6px;font-weight:700;font-size:12px;">🤖 บอทกิล</div>
+    ${b('🤖 บอทขยับ 1 รอบ',"devTerrDo('botAct')",'primary')}${b('🔄 รีเซ็ตบอท (เหมือนขึ้นเดือนใหม่)',"devTerrDo('botReset')")}
     <div style="margin-top:6px;font-weight:700;font-size:12px;">ล้าง</div>
     ${b('🗑️ ลบของกิลทดสอบ',"devTerrDo('clearTest')")}${b('🗑️ ลบค่าย/ธงกิลเราทั้งหมด',"devTerrDo('clearMine')")}
     <div class="note">ทดสอบตีธง: วางธงกิลเรา 1 ช่อง → เดินไปช่องข้างๆ → วางธงกิลทดสอบ → เดินกลับมาแล้วเข้าไปช่องธงศัตรู กด "ตีธง" ในกล่องใต้แผนที่ · ทดสอบผู้ป้องกัน: ให้บัญชีที่ 2 (กิลอื่น) มายืนในช่องธงกิลเรา แล้วใช้อีกบัญชีตี · ทดสอบบอสสงครามบนแผนที่: ใช้ปุ่ม "เปิดสงครามทันที" ด้านล่าง</div>
@@ -1507,6 +1510,7 @@ async function devDo(kind, arg){
     case 'noEnc': DEV.noEnc = !DEV.noEnc; msg = `ไม่เจอศัตรูช่องปกติ: ${DEV.noEnc?'เปิด':'ปิด'} (บอส/ทหาร/ผู้เล่นยังเจอ)`; break;
     case 'mapClearCells': profile.mapCleared = {}; msg = 'ล้างช่องที่เคลียร์แล้ว'; break;
     case 'mapRadarOff': profile.mapRadar = null; msg = 'ล้างผลเรดาห์แล้ว'; break;
+    case 'anyTown': DEV.anyTown = !DEV.anyTown; msg = `ใช้เมนูในเมืองได้นอกเมือง: ${DEV.anyTown?'เปิด':'ปิด'} (เฉพาะบัญชีผู้พัฒนา)`; break;
     case 'terrBag': { const a = addItem('cement',200), b2 = addItem('rebar',200); await saveBagItems(); await saveWarehouseItems(); msg = (a&&b2) ? '+200 ปูน · +200 เหล็กเส้น' : 'กระเป๋า/ตู้เซฟเต็ม'; break; }
     case 'gexp': { if(!profile.guildId){ showToast('ต้องอยู่ในกิลก่อน'); return; } await addLedger(profile.guildId, { t:'dev', pid:profile.playerId, name:profile.playerName, gexp:1000 }); await refreshGuildData(true); msg = '+1,000 EXP กิล (ใช้อัปเลเวลกิลเพื่อเพิ่มจำนวนธง)'; break; }
     case 'god': DEV.god = !DEV.god; msg = `อมตะ: ${DEV.god?'เปิด':'ปิด'}`; break;
@@ -1800,6 +1804,7 @@ function renderGuide(){
       • <b>💰 ค่าบำรุงรายวัน</b> (หักจากคลังวัสดุกิลตอนเที่ยงคืน): ค่าย 🧱${c.upCampC??10} 🔩${c.upCampR??10} · ธงละ 🧱${c.upFlagC??1} 🔩${c.upFlagR??1} · <b>ไม่พอจ่าย = ค่ายและธงทุกอัน -1 เลือด</b> · เติมคลังโดยบริจาคปูน/เหล็กเส้นที่แท็บกิล (${c.matPerPt??10} ชิ้น = 1 แต้มกิล)<br>
       • <b>ซ่อม</b>: ยืนบนธง/ค่ายตัวเอง +1 เลือดทุก ${c.repMin??60} นาที · <b>ค่ายแตก</b> = ธงทุกอันของกิลไม่มีเลือด กิลอื่นต่อธงมาทำลายได้ทันที (ซ่อมไม่ได้จนกว่าจะตั้งค่ายใหม่)<br>
       • <b>🌀 วาร์ป</b>: จากในเมืองไปค่ายกิลได้ คูลดาวน์ ${c.warpMin??30} นาที · ยืนที่ค่าย = ตั้งค่ายเป็นจุดเกิด (แพ้แล้วกลับมาเกิดที่ค่าย)<br>
+      • <b>🤖 บอทกิล</b>: กองกำลัง NPC ตั้งค่าย ปักธง ซ่อม และตีธงผู้เล่นที่อยู่ติดเขต แข่งเก็บแต้มครอบครอง · ตีธง/ค่ายบอทต้องชนะทหารเฝ้า (ค่าย 2 ทีม) · บอทล้างหายและเริ่มใหม่ทุกต้นเดือน<br>
       • <b>แต้มครอบครอง</b>: ค่าย/ธงที่สร้างเสร็จ 1 อัน = 1 แต้มทุก ${c.ptsMin??10} นาที + แต้มจากสงครามกิล · กิลที่แต้มสูงสุดของสัปดาห์ = <b>ผู้ครองโซน</b> (เก็บภาษีโซน + รางวัลรายสัปดาห์)`; })()));
     secs.push(gSec('⚔️ สงครามกิล & ครองโซน', `
       🏰 ช่วงสงครามเปิด <b>บอสสงครามจะโผล่บนแผนที่โซนละ 1 จุด</b> (ดูพิกัดที่แท็บกิล) ต้องเดินไปยืนที่ช่องนั้นแล้วตี · ดาเมจรวมอันดับ 1–3 ของโซนได้แต้มครอบครองเพิ่ม<br>
@@ -4766,6 +4771,7 @@ function zoneName(zone){ return STAGES[zone] ? STAGES[zone].name.replace('ด่
 
 // ---------- บัญชีคลังกิล ----------
 async function addLedger(gid, entry){
+  if(String(gid||'').startsWith('bot:') || gid==='__devtest') return true;   // บอทกิล: ภาษี/ของตกหายไปเลย (ไม่มีคลังจริง)
   entry.ts = Date.now();
   return sSet(`gl:${gid}:${rid()}`, entry);
 }
@@ -6656,7 +6662,7 @@ const GCFG_DEFAULT = {
          map_boss_hospital_dia:20, map_boss_hospital_coin:1500, map_boss_hospital_exp:150, map_boss_school_dia:40, map_boss_school_coin:3000, map_boss_school_exp:400,
          map_boss_campground_dia:80, map_boss_campground_coin:6000, map_boss_campground_exp:900, map_boss_ruins_dia:150, map_boss_ruins_coin:10000, map_boss_ruins_exp:2000,
          radar_price_school:500, radar_price_campground:1500, radar_price_ruins:2500,
-         map_mon_pct:40, map_mon_min:60, map_mon_power:115, gacha_dna_price:1000 },
+         map_mon_pct:40, map_mon_min:60, map_mon_power:115, map_zone_floor:75, gacha_dna_price:1000 },
 };
 let GCFG = JSON.parse(JSON.stringify(GCFG_DEFAULT));
 function cfgSet(k){ const v = GCFG.set && GCFG.set[k]; return v!=null ? Number(v) : Number(GCFG_DEFAULT.set[k]||0); }
@@ -6853,7 +6859,7 @@ let curTab = 'gacha', lastCompete = 'arena';
 function goTab(tab){
   if(battleActive && tab!=='battle'){ showToast('⚔️ ระหว่างต่อสู้ใช้เมนูอื่นไม่ได้ — ปิดไฟต์ก่อน'); return; }
   if(!document.querySelector(`.screen[data-screen="${tab}"]`)) return;
-  if(typeof inTown==='function' && profile && !inTown() && !MAP_OUT_TABS.includes(tab)){ closeMoreSheet(); showToast('🏙️ อยู่นอกเมือง — เมนูนี้ใช้ได้เฉพาะในเมือง (เดินกลับเมืองก่อน)'); return; }
+  if(typeof inTown==='function' && profile && !inTown() && !MAP_OUT_TABS.includes(tab) && !(DEV.on && DEV.anyTown && devAllowed())){ closeMoreSheet(); showToast('🏙️ อยู่นอกเมือง — เมนูนี้ใช้ได้เฉพาะในเมือง (เดินกลับเมืองก่อน)'); return; }
   closeMoreSheet();
   const changed = curTab !== tab;
   curTab = tab;
@@ -7400,6 +7406,7 @@ let MAP_HINT_R = 1;                  // รัศมี 3×3 (ช่องติ
 let MAP_BOSS_MS = 30*60000, MAP_VET_MS = 30*60000;
 let MAP_PVP_ZONES = ['school','campground','ruins'];
 let MAP_STEP_STAMINA = 1;
+let MAP_ZONE_FLOOR = 0.75;   // โซนโรงเรียน/ค่ายทหาร/ซากเมือง: ความยากขั้นต่ำ (0–1)
 let MAP_MON_PCT = 40, MAP_MON_MS = 60*60000, MAP_MON_POWER = 1.15;   // จุดมอนสเตอร์ % ของช่อง · สุ่มตำแหน่งใหม่ทุก 60 นาที · ความเก่ง x1.15
 const MAP_CITIES = { hospital:{x:15,y:20}, campground:{x:54,y:4}, school:{x:4,y:45}, ruins:{x:54,y:54} };
 const MAP_CITY_INFO = { hospital:{name:'นิคมโรงพยาบาล',icon:'🏥'}, school:{name:'ชุมชนโรงเรียน',icon:'🏫'}, campground:{name:'ฐานทัพค่ายทหาร',icon:'🪖'}, ruins:{name:'ป้อมซากเมือง',icon:'🏚️'} };
@@ -7424,6 +7431,7 @@ function applyMapCfg(){
   MAP_VET_MS = Math.max(5, n('map_vet_min',30))*60000;
   MAP_STEP_STAMINA = Math.max(0, Math.floor(n('map_step_stamina',1)));
   MAP_MON_PCT = Math.max(0, Math.min(100, n('map_mon_pct',40)));
+  MAP_ZONE_FLOOR = Math.max(0, Math.min(100, n('map_zone_floor',75)))/100;
   MAP_MON_MS = Math.max(5, n('map_mon_min',60))*60000;
   MAP_MON_POWER = Math.max(0.3, n('map_mon_power',115)/100);
   GACHA_COST.diamond = { 1: Math.max(1, Math.floor(n('gacha_dna_price',1000))) };
@@ -7478,7 +7486,8 @@ function mapDecorateEnemy(c, zone){
 }
 function mapEnemyTeam(zone, x, y){
   const c = MAP_CITIES[zone];
-  const t = Math.min(1, Math.max(Math.abs(x-c.x), Math.abs(y-c.y)) / 24);   // 0 = ติดเมือง · 1 = ไกลสุด
+  let t = Math.min(1, Math.max(Math.abs(x-c.x), Math.abs(y-c.y)) / 24);   // 0 = ติดเมือง · 1 = ไกลสุด
+  if(zone!=='hospital') t = Math.max(t, MAP_ZONE_FLOOR);   // โซนอื่นนอกจากโรงพยาบาล: ยากทั้งโซน แม้อยู่ใกล้เมือง
   const [lo,hi] = STAGE_LEVELS[zone];
   const pool = STAGES[zone].grades;
   const team = [];
@@ -7797,7 +7806,10 @@ function terrNextFight(){
   const meUnits = [];
   myChars.forEach(c=>{ if(getFullSetFaction(c)==='zombie') meUnits.push(makeMinionUnit(c)); });
   myChars.forEach(c=> meUnits.push(makeUnit(c,'me')));
-  const enUnits = ((d.snap && d.snap.chars) || []).map(c=>{
+  const enUnits = d.npc
+    ? (()=>{ const z = mapZoneOf(tb.x,tb.y), c = MAP_CITIES[z]; const team = mapEnemyTeam(z, c.x+24, c.y+24); const k = (d.power||120)/100;
+        return team.map(ch=>{ ['hp','atk','defFlat'].forEach(s=>{ if(ch.stats[s]) ch.stats[s] = Math.round(ch.stats[s]*k); }); ch.name = '🤖 '+ch.name; return makeUnit(ch,'en'); }); })()
+    : ((d.snap && d.snap.chars) || []).map(c=>{
     const ch = { ...c, id:'tdef_'+c.id, grade:c.dnaGrade||null };
     const u = makeUnit(ch,'en');
     u.curHp = Math.max(Math.round(ch.stats.hp*0.3), Math.min(ch.stats.hp, Math.round(c.currentHp||ch.stats.hp)));
@@ -7812,7 +7824,7 @@ function terrNextFight(){
   document.getElementById('sceneImg').style.backgroundImage = `url(${SCENES[STAGES[mapZoneOf(tb.x,tb.y)].scene]})`;
   document.getElementById('btnStep').disabled = false;
   if(tb.idx===0) document.getElementById('battleLog').innerHTML='';
-  logLine('sys', `🚩 ตี${tb.target.t==='camp'?'ค่าย':'ธง'}กิล ${esc(tb.target.gn)} — ผู้ป้องกันคนที่ ${tb.idx+1}/${tb.defs.length}: ${esc(d.n)} (Lv.${d.lv})`);
+  logLine('sys', `🚩 ตี${tb.target.t==='camp'?'ค่าย':'ธง'}กิล ${esc(tb.target.gn)} — ผู้ป้องกันคนที่ ${tb.idx+1}/${tb.defs.length}: ${esc(d.n)}${d.npc?'':` (Lv.${d.lv})`}`);
   renderBattle();
   if(profile.mapAuto) setTimeout(()=>{ if(battleActive && !battleOver && !autoTimer) fastBattle(); }, 300);
 }
@@ -7882,7 +7894,7 @@ function mapIsRuin(x, y){ if(mapIsCity(x,y)) return false; const c = MAP_CITIES[
 function mapMonWin(now){ return Math.floor((now||Date.now())/MAP_MON_MS); }
 function mapMonAt(x, y, now){ if(mapIsCity(x,y) || mapIsRuin(x,y)) return false; const w = mapMonWin(now); return mapNoise((x*17 + w*7919) % 1000003, (y*29 + w*104729) % 1000003) * 100 < MAP_MON_PCT; }
 function mapMonLeftMs(){ return (mapMonWin()+1)*MAP_MON_MS - Date.now(); }
-function mapTier(x, y){ const z = mapZoneOf(x,y), c = MAP_CITIES[z]; return 1 + Math.min(4, Math.floor(Math.max(Math.abs(x-c.x),Math.abs(y-c.y))/6)); }
+function mapTier(x, y){ const z = mapZoneOf(x,y), c = MAP_CITIES[z]; const d = Math.max(Math.abs(x-c.x),Math.abs(y-c.y)); const t = z==='hospital' ? d/24 : Math.max(d/24, MAP_ZONE_FLOOR); return 1 + Math.min(4, Math.floor(Math.min(1,t)*24/6)); }
 const MAP_TIER_LETTER = { hospital:'H', school:'S', campground:'C', ruins:'R' };
 const MAP_TIER_COLOR = ['', '#4caf50', '#9ccc65', '#ffd54a', '#ff8a3d', '#ff3b3b'];   // แถบสีขอบล่าง: เขียว → แดง
 const MAP_TIER_SKULLS = [0, 1, 1, 2, 3, 3];   // จำนวน ☠️ ตามระดับ
@@ -7981,6 +7993,7 @@ function renderMapPanel(){
         <button class="ghost" onclick="mapShowMini=!mapShowMini;renderMapPanel()">🗺️ ${mapShowMini?'ซ่อน':'แผนที่รวม'}</button>
         <button class="ghost" onclick="mapShareChat()">📍 บอกพิกัดในแชท</button>
         ${!town && isOnlineMode() && ON.token ? `<button class="ghost" onclick="onlineLogout()">🚪 ออกจากระบบ</button>` : ''}
+        ${devAllowed() ? `<button class="ghost" onclick="openDevPanel()">🛠️ ผู้พัฒนา</button>` : ''}
       </div>
     </div>
     ${hint}
@@ -8022,6 +8035,7 @@ const MAP_OUT_FUNCS = new Set(['claimDailyLogin','equipGear','unequipGear','disc
   'vetBuyDnaBox','vetBuyRadar','vetMoneyBoxService','vetBuyGold','vetDonate','vetSellGold','claimQuest','useVipBox','openDnaBox']);
 function mapTownBlocked(name){
   if(typeof profile==='undefined' || !profile || inTown()) return false;
+  if(DEV.on && DEV.anyTown && devAllowed()) return false;   // ผู้พัฒนา: ใช้เมนูในเมืองได้ทุกที่
   if(name && MAP_OUT_FUNCS.has(name)) return false;
   if(name==='confirmTeam' && !profile.lockedTeamIds) return false;   // ยังไม่มีทีม → ยืนยันทีมนอกเมืองได้ (เปลี่ยนทีมยังต้องทำในเมือง)
   return true;
