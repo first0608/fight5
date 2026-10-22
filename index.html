@@ -339,6 +339,14 @@
     box-shadow:0 8px 20px rgba(224,168,58,.35), 0 0 0 5px var(--bg-1);
   }
   #tabnav button.fab.active .ic{ transform:scale(1.04); box-shadow:0 8px 24px rgba(224,168,58,.55), 0 0 0 5px var(--bg-1); }
+  .logincal{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .lcd{ position:relative; background:var(--bg-2); border:1px solid var(--line); border-radius:6px; padding:3px 2px; text-align:center; font-size:9px; line-height:1.25; min-height:38px; overflow:hidden; }
+  .lcd b{ display:block; font-size:11px; } .lcd span{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lcd.done{ opacity:.45; } .lcd.today{ outline:2px solid var(--accent); background:rgba(224,168,58,.15); }
+  .lcd i{ position:absolute; top:1px; right:3px; color:var(--good); font-style:normal; font-weight:800; }
+  .mterr{ margin:8px 0 4px; padding:8px; border:1px solid var(--line); border-radius:10px; background:rgba(0,0,0,.25); font-size:12px; }
+  .mterr-act{ display:flex; flex-direction:column; gap:5px; margin-top:6px; }
+  .mterr-act button{ width:100%; font-size:12px; padding:8px; }
   .ptbadge{ display:inline-block; background:var(--accent); color:#1a1a1a; font-weight:800; font-size:9px; padding:0 4px; border-radius:6px; animation:ptpulse 1.6s ease-in-out infinite; }
   @keyframes ptpulse{ 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
   .mteam{ display:flex; gap:6px; margin:6px 0 2px; }
@@ -565,7 +573,7 @@
           <button class="ghost" id="btnAuto" onclick="toggleAutoBattle()">อัตโนมัติ</button>
           <button class="diamond" id="btnInstant" onclick="fastBattle()">⚡ อัตโนมัติเร็ว</button>
           <button class="primary" id="btnModeNext" style="display:none;" onclick="modeNextClick()">▶ ต่อ</button>
-          <button class="ghost" onclick="closeBattle()">ออก</button>
+          <button class="ghost" id="btnLeave" onclick="closeBattle(true)">ออก</button>
         </div>
       </div>
     </div>
@@ -667,6 +675,7 @@
         <button class="tile" onclick="goTab('quest')"><span class="ic">🎯</span>เควส<span class="nbadge" id="tileQuestBadge" style="display:none;">0</span></button>
         <button class="tile" onclick="closeMoreSheet(); openChat()"><span class="ic">💬</span>แชท</button>
         <button class="tile" onclick="closeMoreSheet(); openGuide()"><span class="ic">📖</span>คู่มือ</button>
+        <button class="tile" onclick="closeMoreSheet(); openDailyLogin()"><span class="ic">📅</span>ล็อกอิน<span class="nbadge" id="tileLoginBadge" style="display:none;">!</span></button>
         <button class="tile" onclick="goTab('wheel')"><span class="ic">🎡</span>กงล้อลุ้นโชค</button>
       </div>
     </div>
@@ -1169,7 +1178,7 @@ function applyGift(g, lines){
     g.gearSlots.filter(sl=>EQUIPMENT_DEFS[sl]).forEach(sl=>{ equipment.push(makeEquipmentItem(sl)); lines.push(`⚔️ ${EQUIPMENT_DEFS[sl].name}`); });
   }
 }
-setInterval(()=>{ checkGifts(); onlineTick(); }, 120000);
+setInterval(()=>{ checkGifts(); onlineTick(); try{ renderLoginBadge(); terrFlushExp(); }catch(e){} }, 120000);
 
 // ---------- 💳 โค้ดเติมเงิน ----------
 let topupInfo = null, __topupInfoAt = 0;
@@ -1416,7 +1425,7 @@ async function devAdminDo(op){
   let r; try{ r = await onlineRpc(req); }catch(e){ r = { ok:false, error:'เชื่อมต่อไม่ได้' }; }
   if(!r || !r.ok){ showToast('🛠️ '+((r&&r.error)||'ไม่สำเร็จ')); return; }
   if(op==='status') DEV.admin = r;
-  if(op==='cfgReload' && r.cfg){ GCFG = { quests:r.cfg.quests||GCFG_DEFAULT.quests, ex:r.cfg.ex||GCFG_DEFAULT.ex, set:{...GCFG_DEFAULT.set, ...(r.cfg.set||{})} }; applyMapCfg(); renderQuestTab(); }
+  if(op==='cfgReload' && r.cfg){ GCFG = { quests:r.cfg.quests||GCFG_DEFAULT.quests, ex:r.cfg.ex||GCFG_DEFAULT.ex, set:{...GCFG_DEFAULT.set, ...(r.cfg.set||{})}, login:r.cfg.login||null }; applyMapCfg(); renderQuestTab(); refreshLoginModal(); }
   if(op==='gift'){ ['devGiftCoins','devGiftDia','devGiftMsg'].forEach(id=>{ const e = document.getElementById(id); if(e) e.value=''; }); }
   if(op==='announce'){ const e = document.getElementById('devAnnMsg'); if(e) e.value=''; }
   renderDevPanel();
@@ -1467,7 +1476,7 @@ async function devDo(kind, arg){
     case 'god': DEV.god = !DEV.god; msg = `อมตะ: ${DEV.god?'เปิด':'ปิด'}`; break;
     case 'dmg': DEV.dmgMult = DEV.dmgMult===1 ? 10 : DEV.dmgMult===10 ? 100 : 1; msg = `ดาเมจเรา x${DEV.dmgMult}`; break;
     case 'pipe': profile.pipeTickets = (profile.pipeTickets||0) + 1; msg=`+1 บัตรลงด่านท่อน้ำ (มี ${profile.pipeTickets} ใบ)`; break;
-    case 'daily': profile.lastLoginDate = null; await saveProfile(); closeDevPanel(); checkDailyLogin(); return;
+    case 'daily': { const L = loginState(); L.sLast = null; L.mLast = null; profile.lastLoginDate = null; } await saveProfile(); closeDevPanel(); checkDailyLogin(); return;
     case 'codes': profile.redeemed = []; msg='ใช้โค้ดซ้ำได้แล้ว'; break;
     case 'supply': profile.shopSupplyBought = 0; msg='รีเซ็ตโควต้าเสบียงแล้ว'; break;
     case 'warOpen': {
@@ -1722,15 +1731,17 @@ function renderGuide(){
   secs.push(gSec('🏪 ตลาด · รายวัน · พลังฟาร์ม', `
     ${gTable(['สินค้า','ราคา'],[['🧪 น้ำยาเพิ่มเลือด', SHOP_PRICES.heal_potion+'🪙'],['🎒 เสบียง', `${SHOP_PRICES.oil}🪙 (${SUPPLIES_LIMIT_PER_WINDOW} ชิ้น/2 ชม.)`],['📖 ยาคูณ EXP', `${SHOP_PRICES_DIAMOND.exp_potion}💎 (ได้ ${SHOP_ITEM_QTY.exp_potion||1} หน่วย)`],['✨ น้ำยาคูณดรอป', SHOP_PRICES_DIAMOND.dropmult_potion+'💎'],['🎫 บัตรลงด่านท่อน้ำ', PIPE_MAP_COST+'🪙 / ใบ (ลงได้ 1 ครั้ง)']])}
     <b>พลังฟาร์ม (⚡):</b> สูงสุด 30 ฟื้น +1 ทุก 2 นาที<br>
-    <b>ล็อกอินรายวัน (วน 7 วัน):</b>
-    ${gTable(['วัน','รางวัล'], [1,2,3,4,5,6,7].map(d=>['วันที่ '+d, describeDailyReward(d).join(' · ')]))}`));
+    <b>🎁 รางวัล 7 วันแรก</b> (เข้าเกมครบ 7 วัน ไม่ต้องติดกัน · รับครั้งเดียว ไม่วน):
+    ${gTable(['วัน','รางวัล'], loginCfg().s.slice(0,7).map((r,i)=>['วันที่ '+(i+1), describeLoginReward(r).join(' · ')]))}
+    <b>📅 ล็อกอินประจำเดือน</b> (นับวันที่เข้าเกมในเดือน · รีเซ็ตทุกต้นเดือน · ดูปฏิทินได้ที่ปุ่ม 📅):
+    ${gTable(['ครั้งที่','รางวัล'], loginCfg().m.map((r,i)=>[String(i+1), describeLoginReward(r).join(' · ')]))}`));
 
   if(typeof GUILD_CREATE_COST!=='undefined'){
     secs.push(gSec('🏰 กิล', `
       สร้างกิล ${GUILD_CREATE_COST}🪙 · สมาชิก ${GUILD_MAX_MEMBERS} คน (+1 ต่อเลเวลกิล) · หัวกิลตั้งรองกิลได้ ${GUILD_MAX_VICES} คน · หัวกิลเตะสมาชิก/ยุบกิลได้<br>
       <b>ของในคลังกิลอยู่ได้ 3 วัน</b> เกินแล้วหายไปกลายเป็น <b>EXP กิล</b> (เท่าราคาแต้มของชิ้นนั้น) — หัวกิล/รองกิลใช้ EXP อัปเกรดกิล:
       ${gTable(['อัปเกรด','ต่อเลเวล','สูงสุด','EXP ครั้งแรก'], Object.values(GUILD_UPGRADES).map(d=>[`${d.icon} ${d.label}`, d.fmt(d.per), d.max===Infinity?'-':d.fmt(d.max), `${d.base.toLocaleString()} (x${GUILD_UPG_GROWTH} ทุกครั้ง)`]))}
-      โจมตี/หลบ/ป้องกัน ใช้เมื่อสู้ในโซนที่กิลเราครอง · ดรอป/EXP ใช้ทุกด่าน<br>
+      โจมตี/หลบ/ป้องกัน ใช้เมื่อสู้ในช่องที่เป็นเขตธง/ค่ายของกิลเรา (รวมบอสโซนที่เกิดในเขตกิล) · ดรอป/EXP ใช้ทุกด่าน<br>
       <b>แต้มกิล</b> ได้จากการบริจาคและลงสงคราม ใช้แลกของในคลังกิล
       ${gTable(['บริจาค','ได้แต้ม'],[
         [`🪙 เหรียญ ${GUILD_DONATE_COIN_UNIT}`, GUILD_DONATE_COIN_PTS],[`💎 เพชร 1`, GUILD_PTS_PER_DIAMOND],
@@ -1744,9 +1755,20 @@ function renderGuide(){
         ['⚔️ ดาบเกรด A–SSS', Object.entries(GUILD_GEAR_PTS_WEAPON).map(([g,v])=>`${g} ${v}`).join(' · ')],
         ['🛡️ อุปกรณ์อื่นเกรด A–SSS', Object.entries(GUILD_GEAR_PTS_ARMOR).map(([g,v])=>`${g} ${v}`).join(' · ')],
         ['⚔️ อุปกรณ์ไม้ / 📦 ไอเทม', GUILD_OBJ_PTS_NOGRADE]])}`));
+    secs.push(gSec('🚩 ยึดครองพื้นที่ (ค่ายกิล · ธง)', (()=>{ const c = TERR.cfg||{}; return `
+      • <b>⛺ ค่ายกิล</b> (กิลละ 1 ค่าย): ยืนช่องนอกเมืองแล้วกดตั้งค่าย · ใช้ปูน ${c.campCement??100} เหล็กเส้น ${c.campRebar??100} (จากกระเป๋า) · สร้าง ${c.campMin??20} นาที · เลือด ${c.campHp??15}<br>
+      • <b>🚩 ธง</b>: ต้องปักต่อจากค่าย/ธงของกิลที่สร้างเสร็จแล้ว (ช่องติดกัน บน/ล่าง/ซ้าย/ขวา) · ปูน ${c.flagCement??10} เหล็กเส้น ${c.flagRebar??10} · สร้าง ${c.flagMin??5} นาที · เลือด ${c.flagHp??4} · กิล Lv.1 ปักได้ 10 ธง +5 ธงต่อเลเวลกิล<br>
+      • ช่องที่มีธง/ค่ายของกิลเรา = <b>เขตกิล</b> (ขอบสีเขียว): สู้ในเขตได้บัฟ ATK/หลบ/DEF ของกิล · ชนะมอนในเขตได้ <b>EXP กิล +1</b> ต่อครั้ง<br>
+      • <b>ตีธง/ค่ายกิลอื่น</b>: ต้องปักธงกิลเรามาติดช่องนั้นก่อน แล้วเดินเข้าไปกด "ตี" · ตี 1 ครั้ง = -1 เลือด แล้วอมตะ ${c.immMin??10} นาที · เจ้าของได้รับแจ้งในแชทกิล<br>
+      • <b>ป้องกัน</b>: ไปยืนในช่องธงของกิลตัวเอง · คนตีต้องชนะผู้ป้องกันทุกคนติดกัน (นับสูงสุด ${c.defMax??3} คน เลือดไม่ฟื้นระหว่างคู่) ถ้าแพ้ = ธงไม่โดน · ผู้ป้องกันที่แพ้กลับจุดเกิด<br>
+      • <b>💰 ค่าบำรุงรายวัน</b> (หักจากคลังวัสดุกิลตอนเที่ยงคืน): ค่าย 🧱${c.upCampC??10} 🔩${c.upCampR??10} · ธงละ 🧱${c.upFlagC??1} 🔩${c.upFlagR??1} · <b>ไม่พอจ่าย = ค่ายและธงทุกอัน -1 เลือด</b> · เติมคลังโดยบริจาคปูน/เหล็กเส้นที่แท็บกิล (${c.matPerPt??10} ชิ้น = 1 แต้มกิล)<br>
+      • <b>ซ่อม</b>: ยืนบนธง/ค่ายตัวเอง +1 เลือดทุก ${c.repMin??60} นาที · <b>ค่ายแตก</b> = ธงทุกอันของกิลไม่มีเลือด กิลอื่นต่อธงมาทำลายได้ทันที (ซ่อมไม่ได้จนกว่าจะตั้งค่ายใหม่)<br>
+      • <b>🌀 วาร์ป</b>: จากในเมืองไปค่ายกิลได้ คูลดาวน์ ${c.warpMin??30} นาที · ยืนที่ค่าย = ตั้งค่ายเป็นจุดเกิด (แพ้แล้วกลับมาเกิดที่ค่าย)<br>
+      • <b>แต้มครอบครอง</b>: ค่าย/ธงที่สร้างเสร็จ 1 อัน = 1 แต้มทุก ${c.ptsMin??10} นาที + แต้มจากสงครามกิล · กิลที่แต้มสูงสุดของสัปดาห์ = <b>ผู้ครองโซน</b> (เก็บภาษีโซน + รางวัลรายสัปดาห์)`; })()));
     secs.push(gSec('⚔️ สงครามกิล & ครองโซน', `
+      🏰 ช่วงสงครามเปิด <b>บอสสงครามจะโผล่บนแผนที่โซนละ 1 จุด</b> (ดูพิกัดที่แท็บกิล) ต้องเดินไปยืนที่ช่องนั้นแล้วตี · ดาเมจรวมอันดับ 1–3 ของโซนได้แต้มครอบครองเพิ่ม<br>
       เปิดทุก 2 ชม. (00:00, 02:00 … 22:00 เวลาไทย) ครั้งละ 10 นาที · ลงสู้ฟรีคนละ ${WAR_FREE_ATTEMPTS} ครั้ง ซื้อเพิ่ม 100 → 200 → 400 … เพชร<br>
-      สู้บอสจนทีมล้มหมดหรือบอสตาย · กิลที่ทำดาเมจรวมสูงสุดในโซน <b>ได้ครองโซน</b> (สรุปผลหลังสงครามปิด ${WAR_GRACE_MS/60000} นาที)
+      สู้บอสจนทีมล้มหมดหรือบอสตาย · ดาเมจรวมอันดับ 1/2/3 ของโซนได้ <b>แต้มครอบครอง</b> +30/+15/+5 (สรุปหลังสงครามปิด ${WAR_GRACE_MS/60000} นาที) · ผู้ครองโซนตัดสินจากแต้มครอบครองรวมทั้งสัปดาห์
       ${gTable(['โซน','บอส','HP','ATK'], WAR_ZONES.map(z=>{ const b=WAR_BOSSES[z]; return [zoneName(z), `${FACTIONS[b.faction].icon} ${b.name} ${gradeChip(b.grade)}`, b.stats.hp.toLocaleString(), b.stats.atk]; }))}
       <b>แพ้ในสงครามกิลไม่มีโทษการตาย</b> (ของไม่หาย) · ตีบอสมีลุ้น <b>อุปกรณ์เกรด A–SSS</b> เข้าคลังกิล (ใช้แต้มกิลแลก อยู่ในคลัง 3 วัน)
       ${gTable(['โซน','โอกาสดรอป/ครั้ง','เกรด'], WAR_ZONES.map(z=>[zoneName(z), WAR_GEAR_DROP[z].chance+'%', Object.entries(WAR_GEAR_DROP[z].grades).map(([g,w])=>`${g} ${w}%`).join(' · ')]))}
@@ -2476,77 +2498,110 @@ async function doPartRoll(kind, times){
 }
 
 // ---------- daily login ----------
-const DAILY_REWARDS = {
-  1: { heal_potion:10, oil:5, diamonds:200, dnaBoxDiamond:1, partBoxDiamond:1 },
-  2: { diamonds:25, oil:10 },
-  3: { diamonds:25, oil:10 },
-  4: { diamonds:25, oil:10 },
-  5: { diamonds:25, oil:10 },
-  6: { diamonds:25, oil:10 },
-  7: { dnaSSFixed:1 },
+// 📅 รางวัลล็อกอิน (ตั้งค่าได้ในชีท "📅 รางวัลล็อกอิน")
+//  • 7 วันแรก: เข้าเกมครบ 7 วัน (ไม่ต้องติดกัน) ได้รางวัลวันละชุด แล้วจบ ไม่วนใหม่
+//  • รายเดือน: เข้าเกมวันที่ n ของเดือน (นับเฉพาะวันที่เข้า) ได้รางวัลช่อง n · รีเซ็ตทุกต้นเดือน
+const LOGIN_DEFAULT = {
+  s: [
+    { dia:200, item:'heal_potion', qty:10, dnaBox:1, partBox:1 },
+    { dia:25, item:'oil', qty:10 }, { dia:25, item:'oil', qty:10 }, { dia:25, item:'oil', qty:10 },
+    { dia:25, item:'oil', qty:10 }, { dia:25, item:'oil', qty:10 },
+    { dnaGrade:'SS', dnaQty:1 },
+  ],
+  m: Array.from({length:31}, (_,i)=>{ const d = i+1;
+    if(d===7) return { dia:50, dnaBox:1 }; if(d===14) return { dia:80, partBox:1 }; if(d===21) return { dia:100, dnaBox:1 };
+    if(d===28) return { dnaGrade:'S', dnaQty:1 }; if(d===31) return { dia:150, item:'money_box', qty:2 };
+    return d%2 ? { coins:1000, item:'heal_potion', qty:2 } : { dia:10, item:'oil', qty:1 }; }),
 };
+function loginCfg(){ const l = GCFG && GCFG.login; return { s: (l && l.s && l.s.length) ? l.s : LOGIN_DEFAULT.s, m: (l && l.m && l.m.length) ? l.m : LOGIN_DEFAULT.m }; }
 function todayStr(){
   const d = new Date();
   return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
 }
+function monthStr(){ const d = new Date(); return `${d.getFullYear()}-${d.getMonth()+1}`; }
+function daysInThisMonth(){ const d = new Date(); return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); }
+// ย้ายข้อมูลจากระบบเก่า (loginStreak วนทุก 7 วัน) ครั้งเดียว
+function loginState(){
+  if(!profile.login){
+    const old = Math.min(7, profile.loginStreak||0);
+    profile.login = { s: old, sLast: profile.lastLoginDate||null, m: monthStr(), mn: 0, mLast: null };
+  }
+  const L = profile.login;
+  if(L.m !== monthStr()){ L.m = monthStr(); L.mn = 0; L.mLast = null; }
+  return L;
+}
+function loginPending(){
+  const L = loginState(), cfg = loginCfg(), today = todayStr();
+  const sDay = (L.s < 7 && L.sLast !== today && cfg.s[L.s]) ? L.s + 1 : 0;
+  const mDay = (L.mLast !== today && L.mn < Math.min(31, daysInThisMonth()) && cfg.m[L.mn]) ? L.mn + 1 : 0;
+  return { sDay, mDay };
+}
 function checkDailyLogin(){
-  if(profile.lastLoginDate === todayStr()) return;   // เคยรับของวันนี้ไปแล้ว
-  const nextDay = profile.loginStreak>=7 ? 1 : profile.loginStreak+1;
-  renderDailyLoginModal(nextDay);
+  if(!profile) return;
+  const p = loginPending();
+  renderLoginBadge();
+  if(!p.sDay && !p.mDay) return;
+  renderDailyLoginModal(p);
   document.getElementById('dailyLoginOverlay').classList.add('show');
 }
-function describeDailyReward(day){
-  const r = DAILY_REWARDS[day];
+function openDailyLogin(){ if(!profile) return; renderDailyLoginModal(loginPending()); document.getElementById('dailyLoginOverlay').classList.add('show'); }
+function refreshLoginModal(){ if(!profile) return; renderLoginBadge(); const o = document.getElementById('dailyLoginOverlay'); if(o && o.classList.contains('show')) renderDailyLoginModal(loginPending()); }
+function renderLoginBadge(){ const b = document.getElementById('tileLoginBadge'); if(!b || !profile) return; const p = loginPending(); b.style.display = (p.sDay||p.mDay) ? '' : 'none'; }
+function describeLoginReward(r){
+  if(!r) return [];
   const bits = [];
-  if(r.heal_potion) bits.push(`🧪 น้ำยาเพิ่มเลือด x${r.heal_potion}`);
-  if(r.oil) bits.push(`🎒 เสบียง x${r.oil}`);
-  if(r.diamonds) bits.push(`💎 เพชร x${r.diamonds}`);
-  if(r.dnaBoxDiamond) bits.push(`🧬 กล่องสุ่ม DNA (เพชร) x${r.dnaBoxDiamond}`);
-  if(r.partBoxDiamond) bits.push(`🦴 กล่องสุ่มอวัยวะ (เพชร) x${r.partBoxDiamond}`);
-  if(r.dnaSSFixed) bits.push(`🧬 DNA เกรด SS (สุ่มเผ่า) x${r.dnaSSFixed}`);
-  return bits;
+  if(r.coins) bits.push(`🪙 ${r.coins.toLocaleString()}`);
+  if(r.dia) bits.push(`💎 ${r.dia.toLocaleString()}`);
+  if(r.item && ITEM_DEFS[r.item]) bits.push(`${ITEM_DEFS[r.item].icon||'🔹'} ${ITEM_DEFS[r.item].name} x${r.qty||1}`);
+  if(r.dnaBox) bits.push(`🧬 กล่องสุ่ม DNA x${r.dnaBox}`);
+  if(r.partBox) bits.push(`🦴 กล่องสุ่มอวัยวะ x${r.partBox}`);
+  if(r.dnaGrade) bits.push(`🧬 DNA เกรด ${r.dnaGrade} x${r.dnaQty||1}`);
+  return bits.length ? bits : ['—'];
 }
-function renderDailyLoginModal(day){
-  const html = `
+function renderDailyLoginModal(p){
+  const L = loginState(), cfg = loginCfg();
+  const dim = Math.min(31, daysInThisMonth());
+  const sBox = p.sDay ? `
+    <div class="note" style="margin:0 0 6px;"><b style="color:var(--accent);">🎁 รางวัล 7 วันแรก</b> — เข้าเกมครบ 7 วัน (ไม่ต้องติดกัน) รับครั้งเดียว</div>
+    ${cfg.s.slice(0,7).map((r,i)=>{ const d=i+1; return `<div class="part-pick-item" style="${d===p.sDay?'outline:2px solid var(--accent);':''} ${d<p.sDay?'opacity:0.4;':''}">
+      <div>วันที่ ${d}${d===p.sDay?' (วันนี้)':d<p.sDay?' ✓':''}<div class="note">${describeLoginReward(r).join(' · ')}</div></div></div>`; }).join('')}` : '';
+  const mView = p.mDay || L.mn+1;   // ไม่มีของรอรับ = แสดงความคืบหน้าเฉยๆ
+  const mBox = true ? `
+    <div class="note" style="margin:${p.sDay?'12px':'0'} 0 6px;"><b style="color:var(--accent);">📅 ล็อกอินประจำเดือน</b> — ${p.mDay ? `วันที่เข้าเกมครั้งที่ ${p.mDay}/${dim} ของเดือนนี้` : `รับไปแล้ว ${L.mn}/${dim} วัน`} (รีเซ็ตต้นเดือน)</div>
+    <div class="logincal">${cfg.m.slice(0,dim).map((r,i)=>{ const d=i+1; const st = d<=L.mn?'done':d===p.mDay?'today':''; return `<div class="lcd ${st}" title="${esc(describeLoginReward(r).join(' · '))}"><b>${d}</b><span>${describeLoginReward(r)[0]}</span>${st==='done'?'<i>✓</i>':''}</div>`; }).join('')}</div>
+    <div class="note">${p.mDay ? `วันนี้ได้: ${describeLoginReward(cfg.m[p.mDay-1]).join(' · ')}` : '✅ วันนี้รับแล้ว — พรุ่งนี้มาใหม่'}</div>` : '';
+  document.getElementById('dailyLoginContent').innerHTML = `
     <div class="panel">
-      <h2>📅 ล็อกอินรายวัน — วันที่ ${day}/7</h2>
-      <div class="note" style="margin-bottom:8px;">เข้าเกมทุกวันเพื่อรับของฟรี ถ้าขาดวันจะเริ่มนับใหม่จากวันที่ 1</div>
-      ${[1,2,3,4,5,6,7].map(d=>`
-        <div class="part-pick-item" style="${d===day?'outline:2px solid var(--accent);':''} ${d<day?'opacity:0.4;':''}">
-          <div>วันที่ ${d}${d===day?' (วันนี้)':''}<div class="note">${describeDailyReward(d).join(' · ')}</div></div>
-        </div>
-      `).join('')}
-      <button class="primary" style="width:100%;margin-top:10px;" onclick="claimDailyLogin(${day})">รับของวันนี้</button>
-    </div>
-  `;
-  document.getElementById('dailyLoginContent').innerHTML = html;
+      <h2>📅 รางวัลล็อกอิน</h2>
+      ${sBox}${mBox}
+      ${(p.sDay||p.mDay) ? `<button class="primary" style="width:100%;margin-top:10px;" onclick="claimDailyLogin()">รับของวันนี้</button>` : ''}
+      <button class="ghost" style="width:100%;margin-top:6px;" onclick="closeDailyLogin()">${(p.sDay||p.mDay)?'ไว้ทีหลัง':'ปิด'}</button>
+    </div>`;
 }
-async function claimDailyLogin(day){
-  const r = DAILY_REWARDS[day];
+function closeDailyLogin(){ document.getElementById('dailyLoginOverlay').classList.remove('show'); const p = loginPending(); if(p.sDay||p.mDay) showToast('รับรางวัลล็อกอินได้ที่ ☰ เมนู → 📅 ล็อกอิน'); }
+function grantLoginReward(r, gained){
+  if(!r) return;
+  if(r.coins){ profile.coins += r.coins; gained.push(`เหรียญ ${r.coins.toLocaleString()}`); }
+  if(r.dia){ profile.diamonds += r.dia; gained.push(`เพชร ${r.dia.toLocaleString()}`); }
+  if(r.item && ITEM_DEFS[r.item]){ const q = r.qty||1; if(addItem(r.item, q)) gained.push(`${ITEM_DEFS[r.item].name} x${q}`); else gained.push(`⚠️ ${ITEM_DEFS[r.item].name} (กระเป๋าเต็ม)`); }
+  if(r.dnaBox){ let n=0; for(let i=0;i<r.dnaBox;i++){ if(dnaPackages.length<DNA_CAP){ dnaPackages.push(rollDNAPackage('diaW')); n++; } } gained.push(`กล่องสุ่ม DNA x${n}`); }
+  if(r.partBox){ let n=0; for(let i=0;i<r.partBox;i++){ if(partsInBag()<PARTS_CAP){ parts.push(makePart('diaW')); n++; } } gained.push(`กล่องสุ่มอวัยวะ x${n}`); }
+  if(r.dnaGrade && DNA_SLOT_CONFIG[r.dnaGrade]){ let n=0; for(let i=0;i<(r.dnaQty||1);i++){ if(dnaPackages.length<DNA_CAP){ dnaPackages.push(makeDNAPackageFixedGrade(r.dnaGrade)); n++; } } gained.push(`DNA เกรด ${r.dnaGrade} x${n}`); }
+}
+async function claimDailyLogin(){
+  const p = loginPending(), L = loginState(), cfg = loginCfg(), today = todayStr();
+  if(!p.sDay && !p.mDay){ document.getElementById('dailyLoginOverlay').classList.remove('show'); return; }
   const gained = [];
-  if(r.heal_potion){ addItem('heal_potion', r.heal_potion); gained.push(`น้ำยาเพิ่มเลือด x${r.heal_potion}`); }
-  if(r.oil){ addItem('oil', r.oil); gained.push(`เสบียง x${r.oil}`); }
-  if(r.diamonds){ profile.diamonds += r.diamonds; gained.push(`เพชร x${r.diamonds}`); }
-  if(r.dnaBoxDiamond){
-    for(let i=0;i<r.dnaBoxDiamond;i++){ if(dnaPackages.length<DNA_CAP) dnaPackages.push(rollDNAPackage('diaW')); }
-    gained.push(`กล่องสุ่ม DNA x${r.dnaBoxDiamond}`);
-  }
-  if(r.partBoxDiamond){
-    for(let i=0;i<r.partBoxDiamond;i++){ if(partsInBag()<PARTS_CAP) parts.push(makePart('diaW')); }
-    gained.push(`กล่องสุ่มอวัยวะ x${r.partBoxDiamond}`);
-  }
-  if(r.dnaSSFixed){
-    for(let i=0;i<r.dnaSSFixed;i++){ if(dnaPackages.length<DNA_CAP) dnaPackages.push(makeDNAPackageFixedGrade('SS')); }
-    gained.push(`DNA เกรด SS x${r.dnaSSFixed}`);
-  }
-  profile.loginStreak = day;
-  profile.lastLoginDate = todayStr();
+  if(p.sDay){ grantLoginReward(cfg.s[p.sDay-1], gained); L.s = p.sDay; L.sLast = today; }
+  if(p.mDay){ grantLoginReward(cfg.m[p.mDay-1], gained); L.mn = p.mDay; L.mLast = today; }
+  profile.lastLoginDate = today;
   await saveProfile();
   await saveBagItems(); await saveWarehouseItems();
   await saveDNAPackages(); await saveParts();
+  onlineFlushNow();
   document.getElementById('dailyLoginOverlay').classList.remove('show');
-  renderAll();
-  showToast(`รับของวันที่ ${day} แล้ว: ${gained.join(', ')}`);
+  renderAll(); renderLoginBadge();
+  showToast(`📅 รับรางวัลล็อกอินแล้ว: ${gained.join(', ')}`);
 }
 
 // ---------- shop ----------
@@ -3657,7 +3712,7 @@ function startBattle(diff, opts){
   currentDiff = diff;
   warBattle = null;
   battleTaxOwner = getTaxOwnerFor(diff);   // ภาษีโซน: จำผู้ครองโซน ณ ตอนเริ่มไฟต์
-  battleGuildBonus = zoneGuildBonusFor(diff);
+  battleGuildBonus = zoneGuildBonusFor(diff, isMap ? opts.map.cell : null);
 
   const myChars = profile.lockedTeamIds.map(id => roster.find(r=>r.id===id)).filter(Boolean);
   // DNA "ระบบป้องกันเต็มรูปแบบ": ตัวที่มีจะถูกบังคับไปยืนแนวหน้าเสมอ (ล็อกแนวหน้า)
@@ -3715,6 +3770,7 @@ function unitCardHtml(u){
   </div>`;
 }
 function renderBattle(){
+  updateLeaveBtn();
   document.getElementById('sideMe').innerHTML = battleUnits.filter(u=>u.side==='me').map(unitCardHtml).join('');
   document.getElementById('sideEnemy').innerHTML = battleUnits.filter(u=>u.side==='en').map(unitCardHtml).join('');
   renderTeamHp();
@@ -3933,6 +3989,7 @@ function checkBattleOutcome(){
   const result = battleOutcome();
   if(!result) return;
   if(modeBattle){ endModeBattle(result); return; }   // อารีน่า/บอสโลก/หอคอย
+  if(terrBattle){ endTerrBattle(result); return; }   // ตีธงที่มีผู้ป้องกัน
   if(pvpBattle){ endPvpBattle(result); return; }   // ดักผู้เล่น
   if(warBattle){ endWarBattle(result); return; }   // สงครามกิล: จบแล้วนับดาเมจ ไม่มีเฟส/ของดรอปปกติ
   if(result==='win'){
@@ -4071,7 +4128,7 @@ const DROP_DIA_MULT = 0.4;                  // เพชรดรอปเหล
 const DROP_GROUP4_DIA_PCT = 8;              // กลุ่มเหรียญ: โอกาสเป็นเพชรแทน (เดิม 20%)
 const DROP_EQUIP_CHANCE = { normal:0.5, ruins:3, pipe:25 };   // โอกาสได้อุปกรณ์ % (เดิม 1/5/40)
 async function endBattle(result){
-  battleOver = true;
+  battleOver = true; updateLeaveBtn();
   if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
 
   // เลือดจริงแบบเรียลไทม์: เก็บเลือดที่เหลือหลังจบไฟต์กลับเข้าตัวละครเสมอ ไม่ว่าจะแพ้/ชนะ/เสมอ
@@ -4235,7 +4292,8 @@ async function endBattle(result){
     questBattleResult(true, battleUnits.filter(u=>u.side==='me' && !u.isMinion).every(u=>u.curHp>0));
     if(!mb && maybeSpawnVeteran(currentDiff)) questAdd('vet', 1);
     if(mb){
-      { const ck = String(mb.cell||'').split(',').map(Number); if(ck.length===2 && isFinite(ck[0]) && isFinite(ck[1])) mapMarkCleared(ck[0], ck[1]); else { const pp = mapPos(); mapMarkCleared(pp.x, pp.y); } }
+      { const ck = String(mb.cell||'').split(',').map(Number); if(ck.length===2 && isFinite(ck[0]) && isFinite(ck[1])) mapMarkCleared(ck[0], ck[1]); else { const pp = mapPos(); mapMarkCleared(pp.x, pp.y); }
+        if(ck.length===2 && terrOwnCell(ck[0], ck[1])){ profile.terrExpPending = (profile.terrExpPending||0) + 1; logLine('sys', '🚩 ฟาร์มในเขตกิล: EXP กิล +1'); } }
       if(mb.boss){
         if(isOnlineMode() && ON.token){
           try{
@@ -4453,14 +4511,18 @@ function toggleAutoBattle(){
   }
 }
 
-function closeBattle(){
+// ห้ามออกกลางไฟต์ (หนีไม่ได้) — ยกเว้นสงครามกิล/อารีน่า/บอสโลก/หอคอย ที่มีระบบนับผลตอนออกอยู่แล้ว
+function battleCanLeave(){ return !battleActive || battleOver || ((!!warBattle || !!modeBattle) && !terrBattle); }
+function updateLeaveBtn(){ const b = document.getElementById('btnLeave'); if(!b) return; const ok = battleCanLeave(); b.disabled = !ok; b.textContent = ok ? 'ออก' : '🔒 สู้ให้จบก่อน'; }
+function closeBattle(byUser){
+  if(byUser && !battleCanLeave()){ showToast('⚔️ ยังสู้ไม่จบ ออกกลางคันไม่ได้ — กด ⚡ อัตโนมัติเร็ว เพื่อให้จบไว'); return; }
   if(warBattle && !warBattle.recorded) endWarBattle('quit');   // ออกกลางไฟต์สงคราม: นับดาเมจที่ทำไปแล้ว
   const backTab = modeBackTab();
   if(modeBattle && !modeBattle.done) endModeBattle('quit');      // ออกกลางไฟต์อารีน่า/บอสโลก/หอคอย
   modeBattle = null;
   const nb = document.getElementById('btnModeNext'); if(nb) nb.style.display='none';
   const wasPvpMap = pvpBattle && pvpBattle.map;
-  warBattle = null; pvpBattle = null; mapBattle = null;
+  warBattle = null; pvpBattle = null; mapBattle = null; terrBattle = null;
   battleActive=false; battleOver=false;
   if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
   autoOn=false;
@@ -4672,14 +4734,15 @@ async function addLedger(gid, entry){
   return sSet(`gl:${gid}:${rid()}`, entry);
 }
 async function loadLedger(gid){
-  const [snapRaw, allRows] = await Promise.all([ sGet(`gsnap:${gid}`), sListGet(`gl:${gid}:`) ]);
+  const [snapRaw, allRows, terrExp] = await Promise.all([ sGet(`gsnap:${gid}`), sListGet(`gl:${gid}:`), sGet(`gtexp:${gid}`) ]);
   const snap = snapRaw || { dia:0, coin:0, gear:[], pts:{}, included:[] };
   const included = new Set(snap.included||[]);
   const rows = allRows.filter(r=>!included.has(r.key));
   const entries = rows.map(r=>({...r.val, _key:r.key})).sort((a,b)=>(a.ts||0)-(b.ts||0));
   // รวมยอด: เพชร/เหรียญในคลัง, อุปกรณ์ในคลัง, แต้มของสมาชิกแต่ละคน
   const t = { dia:snap.dia||0, coin:snap.coin||0, pts:{...(snap.pts||{})},
-    expEarned:snap.expEarned||0, expSpent:snap.expSpent||0, upg:{...(snap.upg||{})} };
+    expEarned:(snap.expEarned||0) + (Number(terrExp)||0), expSpent:snap.expSpent||0, upg:{...(snap.upg||{})} };   // + EXP กิลจากฟาร์มในเขตธง (เซิร์ฟเวอร์นับ)
+  t.terrExp = Number(terrExp)||0;
   const objMap = {};
   const snapTs = snap.compactedAt || Date.now();
   (snap.gear||[]).forEach(g=>{ objMap[g.id] = { ...g, oid:g.id, kind:'gear', _ts:snapTs }; });   // ข้อมูลรูปแบบเก่า
@@ -4708,7 +4771,7 @@ async function loadLedger(gid){
 // บีบอัดบัญชี (เจ้าของกิลเท่านั้น): ย้ายรายการเก่าไปเป็นยอดสรุป แล้วลบทิ้ง กัน list ยาวเกินจนโหลดช้า
 async function compactLedger(gid, entries, treasury){
   const newSnap = { dia:treasury.dia, coin:treasury.coin, objs:treasury.objs, pts:treasury.pts,
-    expEarned:treasury.expEarned, expSpent:treasury.expSpent, upg:treasury.upg,
+    expEarned:treasury.expEarned - (treasury.terrExp||0), expSpent:treasury.expSpent, upg:treasury.upg,
     included: entries.map(e=>e._key), compactedAt: Date.now() };
   if(!(await sSet(`gsnap:${gid}`, newSnap))) return;
   for(const e of entries) await sDel(e._key);
@@ -4791,37 +4854,11 @@ async function fetchWarBoard(windowId, zone){
   return Object.values(byGuild).sort((a,b)=> b.dmg-a.dmg || (a.gid<b.gid?-1:1));
 }
 // สรุปผลครองโซน: ทุกเครื่องคำนวณจากข้อมูลดาเมจชุดเดียวกัน ได้ผลเหมือนกันเสมอ ใครเปิดเกมก่อนก็เป็นคนเขียนผล
+// ผู้ครองโซน: เซิร์ฟเวอร์คำนวณจากแต้มครอบครองสัปดาห์นี้ (ธง/ค่าย + สงครามกิล) แล้วเขียนไว้ที่ zone:<โซน>
 async function refreshZoneOwners(){
   if(!guildState.supported) return;
-  const target = lastResolvableWindow();
   const recs = await Promise.all(WAR_ZONES.map(z=>sGet(`zone:${z}`)));
-  await Promise.all(WAR_ZONES.map(async (zone, zi)=>{
-    let rec = recs[zi];
-    if(rec && rec.resolvedWindow >= target){ guildState.zoneOwners[zone] = rec; return; }
-    const floor = Math.max(rec ? rec.resolvedWindow+1 : -Infinity, target - WAR_SCAN_BACK + 1);
-    const ws = [];
-    for(let w=target; w>=floor; w--) ws.push(w);
-    const boards = await Promise.all(ws.map(w=>fetchWarBoard(w, zone)));   // ดึงทุกรอบพร้อมกัน
-    let winner = null, wonWindow = null;
-    for(let i=0;i<ws.length;i++){
-      const b = boards[i];
-      if(b.length && b[0].dmg>0){ winner = b[0]; wonWindow = ws[i]; break; }
-    }
-    rec = winner
-      ? { gid:winner.gid, gname:winner.gname, dmg:winner.dmg, wonWindow, resolvedWindow:target }
-      : { ...(rec||{gid:null}), resolvedWindow:target };   // ไม่มีใครลงสู้ → ผู้ครองเดิมครองต่อ
-    await sSet(`zone:${zone}`, rec);
-    guildState.zoneOwners[zone] = rec;
-  }));
-  // กิลผู้ครองถูกยุบไปแล้ว → ถือว่าโซนว่าง
-  const alive = await Promise.all(WAR_ZONES.map(z=>{
-    const o = guildState.zoneOwners[z];
-    return o && o.gid ? sGet(`guild:${o.gid}`) : Promise.resolve(true);
-  }));
-  WAR_ZONES.forEach((z,i)=>{
-    const o = guildState.zoneOwners[z];
-    if(o && o.gid && !alive[i]) guildState.zoneOwners[z] = { ...o, gid:null, gname:null };
-  });
+  WAR_ZONES.forEach((z,i)=>{ const r = recs[i]; guildState.zoneOwners[z] = r && r.gid ? r : { gid:null, gname:null }; });
 }
 async function loadWarBoards(){
   const w = warWindowId();
@@ -5122,6 +5159,32 @@ async function donateToGuild(kind){
   await refreshGuildData(true);
   showToast(`🎁 บริจาคสำเร็จ! +${pts} แต้มกิล`);
 }
+// 🧱 บริจาคปูน/เหล็กเส้น → คลังวัสดุกิล (เซิร์ฟเวอร์) + แต้มกิล
+function guildMatInfoHtml(){
+  const me = TERR.me; if(!me || !me.mat) return `<div class="note" style="margin:0;">คลังวัสดุกิล: เปิดแผนที่เพื่อโหลดข้อมูล</div>`;
+  const u = me.upkeep || {c:0,r:0};
+  const days = (u.c||u.r) ? Math.min(u.c ? Math.floor(me.mat.c/u.c) : Infinity, u.r ? Math.floor(me.mat.r/u.r) : Infinity) : null;
+  return `<div class="note" style="margin:0;">คลังวัสดุกิล: 🧱 ${me.mat.c.toLocaleString()} · 🔩 ${me.mat.r.toLocaleString()} · ค่าบำรุงวันละ 🧱 ${u.c} · 🔩 ${u.r}${days!=null?` · <b style="color:${days<2?'var(--bad)':'var(--good)'}">พอจ่ายอีก ${days} วัน</b>`:''}</div>`;
+}
+async function donateMatToGuild(){
+  if(!guildState.guild){ showToast('ต้องอยู่ในกิลก่อน'); return; }
+  if(!isOnlineMode() || !ON.token){ showToast('ต้องออนไลน์'); return; }
+  const per = (TERR.cfg && TERR.cfg.matPerPt) || 10;
+  const c = Math.floor(Number((document.getElementById('guildDonateCement')||{}).value)||0), r = Math.floor(Number((document.getElementById('guildDonateRebar')||{}).value)||0);
+  if(c<0 || r<0 || (!c && !r)){ showToast('ใส่จำนวนปูน/เหล็กเส้น'); return; }
+  if(c%per || r%per){ showToast(`บริจาคทีละ ${per} ชิ้น (${per}, ${per*2}, ${per*3} …)`); return; }
+  if(totalItemQty('cement')<c || totalItemQty('rebar')<r){ showToast('ปูน/เหล็กเส้นไม่พอ'); return; }
+  let res; try{ res = await onlineRpc({ a:'guildMatDonate', t:ON.token, cement:c, rebar:r }); }catch(e){ res = { ok:false, error:'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้' }; }
+  if(!res || !res.ok){ showToast((res&&res.error)||'บริจาคไม่สำเร็จ'); return; }
+  for(let i=0;i<c;i++) await consumeItem('cement');
+  for(let i=0;i<r;i++) await consumeItem('rebar');
+  await saveBagItems(); await saveWarehouseItems();
+  if(res.pts) await addLedger(profile.guildId, { t:'donate', pid:profile.playerId, name:profile.playerName, pts:res.pts, mat:{ c, r } });
+  if(TERR.me) TERR.me.mat = res.mat;
+  await refreshGuildData(true);
+  terrRefresh();
+  showToast(`🧱 บริจาคปูน ${c} · เหล็กเส้น ${r} สำเร็จ! +${res.pts} แต้มกิล`);
+}
 // บริจาคชิ้นส่วนอวัยวะ (ที่ไม่ได้ใส่อยู่) เข้าคลังกิล
 async function donatePartToGuild(partId){
   if(!guildState.guild){ showToast('ต้องอยู่ในกิลก่อน'); return; }
@@ -5203,10 +5266,13 @@ async function redeemGuildObj(oid){
 
 // ---------- ภาษีโซน ----------
 // บัฟเขตกิล: สู้ในโซนที่กิลเราครอง → ได้ ATK/หลบ/DEF ตามการอัปเกรดกิล
-function zoneGuildBonusFor(zone){
-  if(!WAR_ZONES.includes(zone) || !profile.guildId || !guildState.guild) return null;
-  const o = guildState.zoneOwners[zone];
-  if(!o || o.gid!==profile.guildId) return null;
+// บัฟกิล ATK/หลบ/DEF: ใช้เฉพาะตอนสู้ในเขตธง/ค่ายของกิลตัวเอง (ช่องที่ยืนอยู่)
+function zoneGuildBonusFor(zone, cell){
+  if(!profile.guildId || !guildState.guild) return null;
+  const ck = cell || (()=>{ const p = mapPos(); return p.city ? null : mapCellKey(p.x,p.y); })();
+  if(!ck) return null;
+  const [cx,cy] = ck.split(',').map(Number);
+  if(!terrOwnCell(cx,cy)) return null;
   const b = myGuildBonus();
   return (b.atk||b.eva||b.def) ? { atk:b.atk, eva:b.eva, def:b.def } : null;
 }
@@ -5267,8 +5333,15 @@ function makeWarBossChar(zone){
   return { id:newId(), name:`👹 ${b.name}`, faction:b.faction, grade:b.grade, level:1, exp:0,
     stats:{...b.stats}, dna:[], isWarBoss:true, createdAt:Date.now() };
 }
+function warGoBoss(zone){
+  const wc = warBossCell(zone, warWindowId()), p = mapPos();
+  if(p.x===wc.x && p.y===wc.y){ startWarBattle(zone); return; }
+  goTab('battle');
+  showToast(`🏰 บอสสงครามโซน${zoneName(zone)}อยู่ที่ช่อง ${mapCoord(wc.x,wc.y)} — เดินไปที่ช่องนั้นเพื่อตี`);
+}
 async function startWarBattle(zone){
   if(!WAR_ZONES.includes(zone)) return;
+  { const wc = warBossCell(zone, warWindowId()), p = mapPos(); if(p.x!==wc.x || p.y!==wc.y){ showToast(`🏰 บอสสงครามอยู่ที่ช่อง ${mapCoord(wc.x,wc.y)} — ต้องเดินไปยืนที่ช่องนั้นก่อน`); return; } }
   if(battleActive){ showToast('กำลังสู้อยู่ ปิดไฟต์เดิมก่อน'); return; }
   if(!warIsOpen()){ showToast('สงครามกิลยังไม่เปิด'); return; }
   if(!guildState.guild){ showToast('ต้องอยู่ในกิลก่อนถึงลงสงครามได้'); return; }
@@ -5321,7 +5394,7 @@ async function endWarBattle(reason){
   const wb = warBattle;
   if(!wb || wb.recorded) return;
   wb.recorded = true;
-  battleOver = true;
+  battleOver = true; updateLeaveBtn();
   if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
   const btn = document.getElementById('btnStep'); if(btn) btn.disabled = true;
 
@@ -5374,7 +5447,7 @@ function guildEntryText(e){
     const p = []; if(num(e.dia)) p.push(`+${num(e.dia)}💎`); if(num(e.coin)) p.push(`+${num(e.coin)}🪙`); if(e.gear) p.push(`+${esc(e.gear.name)}`); if(e.obj) p.push(`+${esc(guildObjName(e.obj))}`);
     return `💰 ภาษีจาก ${n} (${esc(zoneName(e.zone))}) ${p.join(' ')}`;
   }
-  if(e.t==='donate') return `🎁 ${n} บริจาค ${num(e.dia)?num(e.dia)+'💎':''}${num(e.coin)?num(e.coin)+'🪙':''}${e.obj?esc(guildObjName(e.obj)):''} (+${num(e.pts)} แต้ม)`;
+  if(e.t==='donate') return `🎁 ${n} บริจาค ${num(e.dia)?num(e.dia)+'💎':''}${num(e.coin)?num(e.coin)+'🪙':''}${e.obj?esc(guildObjName(e.obj)):''}${e.mat?`${num(e.mat.c)?' 🧱'+num(e.mat.c):''}${num(e.mat.r)?' 🔩'+num(e.mat.r):''}`:''} (+${num(e.pts)} แต้ม)`;
   if(e.t==='wardrop') return `🎁 ${n} ตีบอส${esc(zoneName(e.zone))} ได้ ${e.obj?esc(guildObjName(e.obj)):'อุปกรณ์'} เข้าคลังกิล`;
   if(e.t==='loot') return `💀 ${n} พ่ายแพ้ที่${esc(zoneName(e.zone))} — ${e.obj?esc(guildObjName(e.obj)):num(e.dia)?num(e.dia)+'💎':num(e.coin)?num(e.coin)+'🪙':'ของ'} ตกเข้าคลังกิล`;
   if(e.t==='warweek') return `🏆 ${n} รับรางวัลครองโซน${esc(zoneName(e.zone))}นานสุดประจำสัปดาห์ (+${num(e.pts)} แต้ม${num(e.gexp)?` · EXP กิล +${num(e.gexp)}`:''})`;
@@ -5409,7 +5482,7 @@ function renderWarPanel(){
       <div style="display:flex;align-items:center;gap:8px;">
         <div style="flex:1;font-size:12px;"><b>${esc(zoneName(zone))}</b> · ${FACTIONS[b.faction].icon} ${esc(b.name)} <span style="color:${GRADES[b.grade].color}">${b.grade}</span>
           <div class="note" style="margin:0;">HP ${b.stats.hp.toLocaleString()} · ATK ${b.stats.atk} · DEF ${b.stats.defFlat}+${b.stats.defPct}%</div></div>
-        <button class="primary" ${canFight?'':'disabled'} onclick="startWarBattle('${zone}')">ลงสู้</button>
+        ${open ? (()=>{ const wc = warBossCell(zone, w); return `<button class="primary" ${canFight?'':'disabled'} onclick="warGoBoss('${zone}')">📍 ${mapCoord(wc.x,wc.y)}</button>`; })() : ''}
       </div>
       <div style="font-size:11px;">${ownerHtml}</div>
       ${boardHtml}
@@ -5480,6 +5553,13 @@ function renderMyGuildPanel(){
       <div class="row" style="margin-top:6px;">
         <input type="text" inputmode="numeric" id="guildDonateCoin" placeholder="จำนวนเหรียญ (ทีละ 500)">
         <button class="primary" style="flex:0 0 auto;" onclick="donateToGuild('coin')">บริจาค🪙</button>
+      </div>
+      <div style="font-size:12px;font-weight:700;margin:10px 0 4px 0;">🧱 บริจาคปูน / 🔩 เหล็กเส้น <span class="note">(${(TERR.cfg&&TERR.cfg.matPerPt)||10} ชิ้น = 1 แต้ม · เข้าคลังวัสดุกิล ใช้จ่ายค่าบำรุงค่าย/ธง)</span></div>
+      ${guildMatInfoHtml()}
+      <div class="row" style="margin-top:6px;">
+        <input type="text" inputmode="numeric" id="guildDonateCement" placeholder="ปูน (มี ${totalItemQty('cement')})">
+        <input type="text" inputmode="numeric" id="guildDonateRebar" placeholder="เหล็กเส้น (มี ${totalItemQty('rebar')})">
+        <button class="primary" style="flex:0 0 auto;" onclick="donateMatToGuild()">บริจาค</button>
       </div>
       <div style="font-size:12px;font-weight:700;margin:10px 0 4px 0;">🦴 บริจาคชิ้นส่วนอวัยวะ</div>
       ${donatePartsHtml}
@@ -5558,7 +5638,7 @@ setInterval(()=>{
   const open = warIsOpen(now);
   if(__lastWarOpen!==null && open!==__lastWarOpen){
     __lastWarOpen = open;
-    if(open) showToast('⚔️ สงครามกิลเปิดแล้ว! ไปที่แท็บกิล');
+    if(open) showToast('⚔️ สงครามกิลเปิดแล้ว! บอสสงครามโผล่บนแผนที่ (🏰) โซนละ 1 จุด — ดูพิกัดที่แท็บกิล'); try{ if(!battleActive && curTab==='battle') renderMapPanel(); }catch(e){}
     refreshGuildData(true);
     return;
   }
@@ -5785,7 +5865,7 @@ async function onlineTick(){
     for(const x of (r.warWeekReward||[])){
       profile.diamonds += x.dia||0; profile.coins += x.coin||0;
       if(x.pts || x.gexp) await addLedger(x.gid, { t:'warweek', pid:profile.playerId, name:profile.playerName, zone:x.zone, pts:x.pts||0, gexp:x.gexp||0 });
-      lines.push(`🏰 กิล "${esc(x.gname)}" ครอง${esc(zoneName(x.zone))}นานสุดประจำสัปดาห์ (${x.hours} ชม.) → 💎 ${x.dia} · 🪙 ${(x.coin||0).toLocaleString()} · แต้มกิล +${x.pts}${x.gexp?` · EXP กิล +${x.gexp}`:''}`);
+      lines.push(`🏰 กิล "${esc(x.gname)}" ครอง${esc(zoneName(x.zone))}ประจำสัปดาห์ (${(x.pts!=null?x.pts:x.hours)} แต้ม) → 💎 ${x.dia} · 🪙 ${(x.coin||0).toLocaleString()} · แต้มกิล +${x.pts}${x.gexp?` · EXP กิล +${x.gexp}`:''}`);
     }
     if(r.bountySurvive && r.bountySurvive.amt>0){ profile.diamonds += r.bountySurvive.amt; lines.push(`🛡️ รอดจากค่าหัว ${r.bountySurvive.total.toLocaleString()}💎 ครบเวลา! ได้รับ 💎 ${r.bountySurvive.amt.toLocaleString()}`); }
     (r.arenaNotes||[]).forEach(x=>{ lines.push(x.win ? `🛡️ ทีมของคุณป้องกันอารีน่าจาก ${esc(x.by)} สำเร็จ (เรต +${x.d})` : `⚔️ ${esc(x.by)} ชนะทีมของคุณในอารีน่า (เรต ${x.d})`); });
@@ -5850,11 +5930,11 @@ function renderWarHoldRank(el, chips){
   const sec = (tbl)=> WAR_ZONES.map(z=>{
     const rows = (tbl && tbl[z]) || []; const rw = d && d.rewards[z];
     return `<div class="panel" style="margin-bottom:10px;"><div class="hdr-row"><h2>${esc(zoneName(z))}</h2>${rw?`<span class="note" style="margin:0;">🏆 💎${rw.dia} · 🪙${rw.coin.toLocaleString()} · แต้มกิล ${rw.pts} · EXP กิล ${rw.gexp}</span>`:''}</div>
-      ${rows.length ? rows.slice(0,5).map((x,i)=>`<div class="lb-row ${profile.guildId===x.gid?'me':''}"><span>${i===0?'👑':'#'+(i+1)} ${esc(x.n||'-')}</span><b>${x.h} ชม.</b></div>`).join('') : '<div class="empty-msg" style="padding:8px;">ยังไม่มีกิลครอง</div>'}</div>`;
+      ${rows.length ? rows.slice(0,5).map((x,i)=>`<div class="lb-row ${profile.guildId===x.gid?'me':''}"><span>${i===0?'👑':'#'+(i+1)} ${esc(x.n||'-')}</span><b>${(x.p!=null?x.p:x.h).toLocaleString()} แต้ม</b></div>`).join('') : '<div class="empty-msg" style="padding:8px;">ยังไม่มีกิลครอง</div>'}</div>`;
   }).join('');
-  el.innerHTML = `<div class="panel"><h2>🏆 ครองโซนนานสุดประจำสัปดาห์</h2><div style="margin:6px 0;">${chips}</div>
+  el.innerHTML = `<div class="panel"><h2>🏆 แต้มครอบครองโซนประจำสัปดาห์</h2><div style="margin:6px 0;">${chips}</div>
       <div style="margin-bottom:6px;"><button class="chip ${!lbView.prev?'on':''}" onclick="lbView.prev=false;renderRank()">สัปดาห์นี้</button><button class="chip ${lbView.prev?'on':''}" onclick="lbView.prev=true;renderRank()">สัปดาห์ที่แล้ว</button> <button class="chip" onclick="lbLoad()">🔄 รีเฟรช</button></div>
-      <div class="note">นับเวลาที่กิลครองแต่ละโซน (สงครามทุก 2 ชม. ครองต่อจนกว่าจะมีกิลอื่นชนะ) · จบทุกวันจันทร์ 00:00 น.${d?` (อีก ${lbFmtLeft(d.endsAt-Date.now())})`:''} · กิลที่ครองนานสุดของแต่ละโซน: สมาชิกทุกคนได้รางวัลอัตโนมัติ (ต้องยังอยู่ในกิลตอนรับ) และกิลได้ EXP</div>
+      <div class="note">แต้มครอบครอง = ค่าย/ธงที่สร้างเสร็จ 1 อัน ได้ 1 แต้มทุก ${(TERR.cfg&&TERR.cfg.ptsMin)||10} นาที + สงครามกิล (ดาเมจอันดับ 1–3 ของโซนได้แต้มเพิ่ม) · กิลที่แต้มสูงสุด = ผู้ครองโซน · จบทุกวันจันทร์ 00:00 น.${d?` (อีก ${lbFmtLeft(d.endsAt-Date.now())})`:''} · กิลที่ครองนานสุดของแต่ละโซน: สมาชิกทุกคนได้รางวัลอัตโนมัติ (ต้องยังอยู่ในกิลตอนรับ) และกิลได้ EXP</div>
       ${whView.err?`<div class="empty-msg">${esc(whView.err)}</div>`:''}</div>
     ${d ? sec(lbView.prev ? d.prev : d.cur) : (whView.err?'':'<div class="empty-msg">กำลังโหลด…</div>')}`;
 }
@@ -6448,7 +6528,7 @@ function startPvpBattle(st, target, attackId){
 }
 async function endPvpBattle(result){
   const pb = pvpBattle; if(!pb || pb.done) return;
-  pb.done = true; battleOver = true;
+  pb.done = true; battleOver = true; updateLeaveBtn();
   if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
   battleUnits.filter(u=>u.side==='me' && !u.isMinion).forEach(u=>{ u.char.currentHp = u.curHp; });
   await saveRoster();
@@ -6465,7 +6545,7 @@ async function endPvpBattle(result){
   } else if(result==='lose'){
     logLine('sys', `💀 ${pb.map?'แพ้การต่อสู้':'ดักไม่สำเร็จ'} — ทีมเราแพ้ยกทีม`);
     await applyDeathPenalty();
-    if(pb.map){ const p0 = mapPos(); const lc = MAP_CITIES[p0.lc] ? p0.lc : 'hospital'; profile.mapPos = { x:MAP_CITIES[lc].x, y:MAP_CITIES[lc].y, z:lc, city:true, lc }; profile.mapRadar = null; await saveProfile(); logLine('sys', `🏥 ฟื้นคืนชีพที่${MAP_CITY_INFO[lc].name}`); }
+    if(pb.map){ const p0 = mapPos(); profile.mapPos = mapSpawnLocal(p0.lc||'hospital'); profile.mapRadar = null; await saveProfile(); logLine('sys', `🏥 ฟื้นคืนชีพที่${mapSpawnName(profile.mapPos)}`); }
   } else logLine('sys', '⚖️ เสมอ');
   try{
     const rr = await onlineRpc({ a:'pvpResult', t:ON.token, attackId:pb.attackId, win: result==='win', loot });
@@ -6545,7 +6625,7 @@ async function loadGameCfg(){
   if(!isOnlineMode()) return;
   try{
     const r = await onlineRpc({ a:'cfg' });
-    if(r && r.ok && r.cfg){ GCFG = { quests:r.cfg.quests||GCFG_DEFAULT.quests, ex:r.cfg.ex||GCFG_DEFAULT.ex, set:{...GCFG_DEFAULT.set, ...(r.cfg.set||{})} }; applyMapCfg(); renderQuestTab(); try{ if(!battleActive && document.querySelector('.screen.active[data-screen="battle"]')) renderMapPanel(); }catch(e){} }
+    if(r && r.ok && r.cfg){ GCFG = { quests:r.cfg.quests||GCFG_DEFAULT.quests, ex:r.cfg.ex||GCFG_DEFAULT.ex, set:{...GCFG_DEFAULT.set, ...(r.cfg.set||{})}, login:r.cfg.login||null }; applyMapCfg(); renderQuestTab(); refreshLoginModal(); try{ if(!battleActive && document.querySelector('.screen.active[data-screen="battle"]')) renderMapPanel(); }catch(e){} }
   } catch(e){}
 }
 setInterval(loadGameCfg, 5*60000);
@@ -6821,7 +6901,7 @@ function startModeBattle(mode, meUnits, enUnits, scene, intro){
 }
 async function endModeBattle(result){
   const mb = modeBattle; if(!mb || mb.done) return;
-  mb.done = true; battleOver = true;
+  mb.done = true; battleOver = true; updateLeaveBtn();
   if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
   const btn = document.getElementById('btnStep'); if(btn) btn.disabled = true;
   try{
@@ -7412,7 +7492,7 @@ async function mapSync(){
   await mapQ;
   try{
     const r = await onlineRpc({ a:'mapState', t:ON.token });
-    if(r && r.ok){ profile.mapPos = r.pos; profile.mapVer = MAP_VER; mapHints = r.hints || mapHints; profile.mapBosses = r.bosses; await saveProfile(); renderMapPanel(); }
+    if(r && r.ok){ profile.mapPos = r.pos; profile.mapVer = MAP_VER; mapHints = r.hints || mapHints; profile.mapBosses = r.bosses; if(r.terr) terrApply(r.terr); await saveProfile(); renderMapPanel(); }
   }catch(e){}
 }
 
@@ -7464,6 +7544,8 @@ async function mapStep(dx, dy){
     });
   } else mapAfterServer(local, x, y);
   // ช่องปกติ: สู้ทันทีไม่ต้องรอเซิร์ฟเวอร์
+  const wbz = !toCity && warBossAt(x,y);
+  if(wbz && guildState.guild && warAttemptsLeft()>0){ setTimeout(()=>{ if(!battleActive) startWarBattle(wbz); }, 200); renderMapPanel(); return; }
   if(!toCity && mapMonAt(x,y) && !mapCleared(x,y) && !(DEV.on && DEV.noEnc)) startBattle(z, { map:{ cell:mapCellKey(x,y), zone:z }, enemies: mapEnemyTeam(z, x, y) });
   else { renderMapPanel(); if(toCity) renderAll(); }
 }
@@ -7531,15 +7613,22 @@ function mapMaybeAuto(){
   autoTimer = setInterval(()=>{ if(!battleOver) battleStep(); else { clearInterval(autoTimer); autoTimer=null; } }, 80);
 }
 // แพ้ยกทีม → กลับไปเกิดที่เมืองล่าสุด
+function mapSpawnLocal(lc){
+  const cp = TERR.me && TERR.me.camp;
+  if(lc==='camp' && cp && cp.done<=terrNow()) return { x:cp.x, y:cp.y, z:mapZoneOf(cp.x,cp.y), city:false, lc:'camp' };
+  const c = MAP_CITIES[lc] ? lc : 'hospital';
+  return { x:MAP_CITIES[c].x, y:MAP_CITIES[c].y, z:c, city:true, lc:c };
+}
+function mapSpawnName(pos){ return pos.lc==='camp' ? '⛺ ค่ายกิล' : (MAP_CITY_INFO[pos.lc]||MAP_CITY_INFO.hospital).name; }
 async function mapRespawn(){
   const p = mapPos();
-  const lc = MAP_CITIES[p.lc] ? p.lc : 'hospital';
-  profile.mapPos = { x:MAP_CITIES[lc].x, y:MAP_CITIES[lc].y, z:lc, city:true, lc };
+  const lc = p.lc || 'hospital';
+  profile.mapPos = mapSpawnLocal(lc);
   mapPendingEnc = null;
   if(isOnlineMode() && ON.token) mapQueue(async ()=>{ try{ const r = await onlineRpc({ a:'mapRespawn', t:ON.token }); if(r && r.ok){ profile.mapPos = r.pos; profile.mapVer = MAP_VER; } }catch(e){} });
   profile.mapRadar = null; profile.veteranUntil = 0;
   await saveProfile();
-  logLine('sys', `🏥 ฟื้นคืนชีพที่${MAP_CITY_INFO[profile.mapPos.lc||lc].name} (เมืองล่าสุด)`);
+  logLine('sys', `🏥 ฟื้นคืนชีพที่${mapSpawnName(profile.mapPos)} (จุดเกิดล่าสุด)`);
 }
 
 // ---------- ของนอกเมือง ----------
@@ -7570,6 +7659,173 @@ async function mapUseRadar(zone){
   await saveBagItems(); await saveProfile();
   renderMapPanel();
   showToast(`📡 สแกน${MAP_ZONE_NAME[zone]}: เจอผู้เล่น ${r.list.length} คน (ผลอยู่ได้ ${MAP_RADAR_STEPS} ก้าว)`);
+}
+
+// =====================================================================
+// 🚩 ยึดครองพื้นที่: ค่ายกิล + ธง (ข้อมูลจริงอยู่บนเซิร์ฟเวอร์ · ดู terr*_ ใน Code.gs)
+// =====================================================================
+const TERR = { list:[], map:{}, me:null, cfg:{}, ts:0 };
+let terrBattle = null;   // การตีธงที่มีคนป้องกัน: { id, x, y, defs:[], idx, target }
+function terrApply(r){
+  if(!r || !r.list) return;
+  TERR.list = r.list; TERR.map = {}; r.list.forEach(f=>{ TERR.map[f.x+','+f.y] = f; });
+  TERR.me = r.me || null; TERR.cfg = r.cfg || TERR.cfg; TERR.ts = Date.now();
+  TERR.skew = r.now ? r.now - Date.now() : 0;
+}
+function terrNow(){ return Date.now() + (TERR.skew||0); }
+function terrAt(x,y){ return TERR.map[x+','+y] || null; }
+function terrDone(f){ return f && (f.done||0) <= terrNow(); }
+function terrMine(f){ return !!(f && TERR.me && f.g === TERR.me.gid); }
+function terrOwnCell(x,y){ const f = terrAt(x,y); return terrMine(f) && terrDone(f); }
+function terrAdjOwn(x,y){ return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=> terrOwnCell(x+dx,y+dy)); }
+function terrColor(gid){ let h = 0; for(const ch of String(gid)) h = (h*31 + ch.charCodeAt(0))>>>0; return `hsl(${h%360},85%,60%)`; }
+function terrMinLeft(t){ return Math.max(1, Math.ceil((t - terrNow())/60000)); }
+async function terrRefresh(){
+  if(!isOnlineMode() || !ON.token) return;
+  try{ const r = await onlineRpc({ a:'terrState', t:ON.token }); if(r && r.ok){ terrApply(r); if(!battleActive && curTab==='battle') renderMapPanel(); } }catch(e){}
+}
+setInterval(()=>{ if(profile && curTab==='battle' && !battleActive && document.visibilityState!=='hidden') terrRefresh(); }, 60000);
+function terrPanelHtml(p){
+  if(!isOnlineMode() || !ON.token) return '';
+  const me = TERR.me, c = TERR.cfg || {};
+  const lines = [];
+  if(!me){ return `<div class="mterr"><b>🚩 พื้นที่กิล</b><div class="note" style="margin:2px 0 0;">เข้ากิลก่อน ถึงตั้งค่าย/ปักธงยึดพื้นที่ได้</div></div>`; }
+  const head = `<b>🚩 ${esc(me.name)}</b> <span class="note" style="margin:0;">Lv.${me.lv} · ธง ${me.flags}/${me.max} · ค่าย ${me.camp ? mapCoord(me.camp.x,me.camp.y)+(me.camp.done>terrNow()?' (กำลังสร้าง)':'') : '—'}</span>${(me.camp||me.flags) ? guildMatInfoHtml() : ''}`;
+  const f = p.city ? null : terrAt(p.x,p.y);
+  const btn = (label, op, cls='ghost', dis=false)=>`<button class="${cls}" ${dis?'disabled':''} onclick="terrDo('${op}')">${label}</button>`;
+  if(p.city){
+    if(me.camp && me.camp.done<=terrNow()) lines.push(me.warpAt > terrNow() ? btn(`🌀 วาร์ปไปค่ายกิล (อีก ${terrMinLeft(me.warpAt)} นาที)`,'warp','ghost',true) : btn(`🌀 วาร์ปไปค่ายกิล ${mapCoord(me.camp.x,me.camp.y)}`,'warp','primary'));
+    else lines.push(`<div class="note" style="margin:0;">ออกไปนอกเมืองแล้วตั้งค่ายกิล (ปูน ${c.campCement} · เหล็กเส้น ${c.campRebar}) เพื่อเริ่มยึดพื้นที่</div>`);
+  } else if(!f){
+    if(mapIsRuin(p.x,p.y)){}
+    else if(!me.camp) lines.push(btn(`⛺ ตั้งค่ายกิลที่นี่ · 🧱${c.campCement} 🔩${c.campRebar} · ${c.campMin} นาที`,'camp','primary'));
+    else if(terrAdjOwn(p.x,p.y)) lines.push(btn(`🚩 ปักธงที่นี่ · 🧱${c.flagCement} 🔩${c.flagRebar} · ${c.flagMin} นาที`,'flag','primary', me.flags>=me.max));
+    else lines.push(`<div class="note" style="margin:0;">ปักธงได้เฉพาะช่องที่ติดกับค่าย/ธงของกิล (บน/ล่าง/ซ้าย/ขวา)</div>`);
+  } else {
+    const done = terrDone(f), what = f.t==='camp' ? 'ค่ายกิล' : 'ธง';
+    const st = !done ? `⏳ กำลังสร้าง เสร็จใน ${terrMinLeft(f.done)} นาที` : `❤️ ${f.hp}/${f.max}${f.hp<=0?' (ไม่มีค่ายคุ้มกัน)':''}${f.imm>terrNow()&&f.hp>0?` · 🛡️ อมตะอีก ${terrMinLeft(f.imm)} นาที`:''}`;
+    lines.push(`<div style="font-size:12px;">${f.t==='camp'?'⛺':'🚩'} ${what}ของ <b style="color:${terrColor(f.g)}">${esc(f.gn)}</b> · ${st}</div>`);
+    if(terrMine(f)){
+      if(done && f.hp<f.max) lines.push(f.rep > terrNow() ? btn(`🔧 ซ่อมได้อีกใน ${terrMinLeft(f.rep)} นาที`,'repair','ghost',true) : btn('🔧 ซ่อม +1','repair','primary'));
+      lines.push(btn(`🗑️ รื้อ${what}`,'remove'));
+      if(f.t==='camp' && done) lines.push(`<div class="note" style="margin:0;">⛺ ยืนที่ค่าย = ตั้งเป็นจุดเกิดของคุณแล้ว</div>`);
+    } else if(done){
+      if(!terrAdjOwn(p.x,p.y)) lines.push(`<div class="note" style="margin:0;">ต้องต่อธงกิลเรามาติดช่องนี้ก่อนถึงตีได้</div>`);
+      else if(f.hp>0 && f.imm>terrNow()) lines.push(btn(`⚔️ ตีได้อีกใน ${terrMinLeft(f.imm)} นาที`,'attack','ghost',true));
+      else lines.push(btn(f.hp<=0 ? `💥 ทำลาย${what} (ไม่มีเลือด)` : `⚔️ ตี${what} (-1 เลือด)`,'attack','primary'));
+    }
+  }
+  return `<div class="mterr">${head}<div class="mterr-act">${lines.join('')}</div></div>`;
+}
+async function terrDo(op){
+  if(battleActive || !isOnlineMode() || !ON.token) return;
+  const c = TERR.cfg || {}, p = mapPos();
+  let need = null;
+  if(op==='camp') need = { cement:c.campCement, rebar:c.campRebar };
+  if(op==='flag') need = { cement:c.flagCement, rebar:c.flagRebar };
+  if(need){
+    const has = k => inTown() ? totalItemQty(k) : bagOnlyQty(k);
+    if(has('cement') < need.cement || has('rebar') < need.rebar){ showToast(`วัสดุในกระเป๋าไม่พอ: ปูน ${has('cement')}/${need.cement} · เหล็กเส้น ${has('rebar')}/${need.rebar}`); return; }
+    if(!confirm(`${op==='camp'?'ตั้งค่ายกิล':'ปักธง'}ที่ ${mapCoord(p.x,p.y)}?\nใช้ปูน ${need.cement} · เหล็กเส้น ${need.rebar}`)) return;
+  }
+  if(op==='remove' && !confirm('รื้อสิ่งก่อสร้างนี้? (ไม่คืนวัสดุ' + ((terrAt(p.x,p.y)||{}).t==='camp' ? ' · รื้อค่ายแล้วธงทั้งหมดจะไม่มีเลือด' : '') + ')')) return;
+  const a = { camp:'terrBuild', flag:'terrBuild', remove:'terrRemove', repair:'terrRepair', warp:'terrWarp', attack:'terrAttack' }[op];
+  await mapQ;   // รอการเดินที่ค้างอยู่ให้ถึงเซิร์ฟเวอร์ก่อน (ใช้ตำแหน่งบนเซิร์ฟเวอร์)
+  let r; try{ r = await onlineRpc({ a, t:ON.token, kind: op==='camp'?'camp':'flag' }); }catch(e){ r = { ok:false, error:'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้' }; }
+  if(!r || !r.ok){ showToast((r&&r.error)||'ไม่สำเร็จ'); terrRefresh(); return; }
+  if(need){ for(const [k,q] of [['cement',need.cement],['rebar',need.rebar]]){ for(let i=0;i<q;i++) await consumeItem(k); } await saveBagItems(); await saveWarehouseItems(); }
+  if(r.pos){ profile.mapPos = r.pos; profile.mapVer = MAP_VER; mapHints = { howl:false, car:false }; await saveProfile(); }
+  if(r.attackId){ terrStartGauntlet(r); return; }
+  terrApply(r);
+  renderAll(); renderMapPanel();
+  if(r.msg) showToast(r.msg);
+}
+// ตีธงที่มีคนป้องกัน: ต้องชนะทุกคนติดกัน (เลือดทีมเราไม่ฟื้นระหว่างคู่)
+function terrStartGauntlet(r){
+  const p = mapPos();
+  terrBattle = { id:r.attackId, x:p.x, y:p.y, defs:r.defenders, idx:0, target:r.target };
+  showToast(`🛡️ มีผู้ป้องกัน ${r.defenders.length} คน — ต้องชนะทุกคนติดกัน`);
+  terrNextFight();
+}
+function terrNextFight(){
+  const tb = terrBattle; if(!tb) return;
+  const d = tb.defs[tb.idx];
+  battleActive = true; battleOver = false;
+  warBattle = null; pvpBattle = null; modeBattle = null; mapBattle = null; currentDiff = 'pvp'; battleTaxOwner = null;
+  battleGuildBonus = zoneGuildBonusFor(mapZoneOf(tb.x,tb.y), mapCellKey(tb.x,tb.y));
+  const myChars = profile.lockedTeamIds.map(id=>roster.find(r=>r.id===id)).filter(Boolean);
+  myChars.sort((a,b)=> getDNACount(b,'fulldef') - getDNACount(a,'fulldef'));
+  const meUnits = [];
+  myChars.forEach(c=>{ if(getFullSetFaction(c)==='zombie') meUnits.push(makeMinionUnit(c)); });
+  myChars.forEach(c=> meUnits.push(makeUnit(c,'me')));
+  const enUnits = ((d.snap && d.snap.chars) || []).map(c=>{
+    const ch = { ...c, id:'tdef_'+c.id, grade:c.dnaGrade||null };
+    const u = makeUnit(ch,'en');
+    u.curHp = Math.max(Math.round(ch.stats.hp*0.3), Math.min(ch.stats.hp, Math.round(c.currentHp||ch.stats.hp)));
+    u.alive = u.curHp>0; return u;
+  });
+  battleUnits = [...meUnits, ...enUnits];
+  roundQueue = []; currentPhase = 1; bypassFront = {me:false, en:false};
+  document.getElementById('battleSetup').style.display='none';
+  document.getElementById('battleWheelBox').style.display='none';
+  document.getElementById('stageSelect').style.display='none';
+  document.getElementById('battleStage').style.display='block';
+  document.getElementById('sceneImg').style.backgroundImage = `url(${SCENES[STAGES[mapZoneOf(tb.x,tb.y)].scene]})`;
+  document.getElementById('btnStep').disabled = false;
+  if(tb.idx===0) document.getElementById('battleLog').innerHTML='';
+  logLine('sys', `🚩 ตี${tb.target.t==='camp'?'ค่าย':'ธง'}กิล ${esc(tb.target.gn)} — ผู้ป้องกันคนที่ ${tb.idx+1}/${tb.defs.length}: ${esc(d.n)} (Lv.${d.lv})`);
+  renderBattle();
+  if(profile.mapAuto) setTimeout(()=>{ if(battleActive && !battleOver && !autoTimer) fastBattle(); }, 300);
+}
+async function endTerrBattle(result){
+  const tb = terrBattle; if(!tb || tb.ending) return;
+  battleUnits.filter(u=>u.side==='me' && !u.isMinion).forEach(u=>{ u.char.currentHp = u.curHp; });
+  await saveRoster();
+  if(result==='win' && tb.idx+1 < tb.defs.length){
+    logLine('sys', `✅ ชนะ ${esc(tb.defs[tb.idx].n)}! ต่อคนถัดไป…`);
+    tb.idx++;
+    if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+    setTimeout(terrNextFight, 1200);
+    return;
+  }
+  tb.ending = true;
+  battleOver = true; updateLeaveBtn();
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  const win = result==='win';
+  let r = null;
+  try{ r = await onlineRpc({ a:'terrAttackResult', t:ON.token, attackId:tb.id, win, beaten: win ? tb.defs.length : tb.idx }); }catch(e){}
+  if(win){
+    logLine('sys', r && r.hit ? (r.hit.destroyed ? '💥 ทำลายสำเร็จ!' : `⚔️ ชนะผู้ป้องกันทั้งหมด! ตีโดน เหลือ ${r.hit.hp}`) : '⚔️ ชนะผู้ป้องกันทั้งหมด');
+  } else {
+    logLine('sys', `💀 แพ้ผู้ป้องกัน — ตีธงไม่สำเร็จ`);
+    await applyDeathPenalty();
+  }
+  if(r && r.pos){ profile.mapPos = r.pos; profile.mapVer = MAP_VER; }
+  if(r && r.ok) terrApply(r);
+  await saveProfile();
+  onlineFlush();
+  document.getElementById('btnStep').disabled = true;
+  renderAll();
+}
+// EXP กิลจากการฟาร์มในเขตธงตัวเอง: สะสมไว้แล้วส่งเป็นชุด
+async function terrFlushExp(){
+  const n = profile && profile.terrExpPending || 0;
+  if(!n || !isOnlineMode() || !ON.token) return;
+  try{ const r = await onlineRpc({ a:'terrExp', t:ON.token, n }); if(r && r.ok){ profile.terrExpPending = Math.max(0, (profile.terrExpPending||0) - n); saveProfile(); } }catch(e){}
+}
+// 🏰 บอสสงครามกิลบนแผนที่: ช่วงสงครามเปิด บอสโผล่โซนละ 1 จุด (ทุกคนเห็นตำแหน่งเดียวกัน) เดินไปตีเอง
+function warBossCell(zone, w){
+  let h = 2166136261; const s = 'warboss:'+zone+':'+w;
+  for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619)>>>0; }
+  const ox = (zone==='hospital'||zone==='school') ? 0 : MAP_HALF, oy = (zone==='hospital'||zone==='campground') ? 0 : MAP_HALF;
+  const c = MAP_CITIES[zone];
+  for(let i=0;i<20;i++){ h = Math.imul(h ^ (h>>>13), 1274126177)>>>0; const x = ox + h%MAP_HALF, y = oy + (h>>>8)%MAP_HALF; if(Math.max(Math.abs(x-c.x),Math.abs(y-c.y))>=5 && !mapIsRuin(x,y)) return {x,y}; }
+  return { x:ox+3, y:oy+3 };
+}
+function warBossAt(x, y){
+  if(typeof warIsOpen!=='function' || !warIsOpen()) return null;
+  const z = mapZoneOf(x,y), c = warBossCell(z, warWindowId());
+  return c.x===x && c.y===y ? z : null;
 }
 
 // ---------- หน้าจอแผนที่ ----------
@@ -7620,10 +7876,14 @@ function mapCellHtml(x, y, p, size){
   if(me) inner = `<span class="mic">🧍</span>`;
   else if(city) inner = `<span class="mcity">${MAP_CITY_INFO[z].icon}</span>`;
   else if(rd.length) inner = `<span class="mic">${rd.some(o=>o.red)?'🟥':'👤'}</span>`;
+  else if(warBossAt(x,y)) inner = `<span class="mic">🏰</span>`;
+  else if(terrAt(x,y)){ const tf = terrAt(x,y); inner = `<span class="mic" style="${terrDone(tf)?'':'opacity:.5;'}">${tf.t==='camp'?'⛺':'🚩'}</span>`; }
   else if(mapMonAt(x,y) && !mapCleared(x,y)){ const t = mapTier(x,y); inner = `<span class="mskull">${'☠️'.repeat(MAP_TIER_SKULLS[t])}</span>`; }
   const tier = city ? 0 : mapTier(x,y);
   if(tier) edges.push(`inset 0 -3px 0 ${MAP_TIER_COLOR[tier]}`);
-  const title = `${mapCoord(x,y)} · ` + (city ? MAP_CITY_INFO[z].name : ruin ? 'ซากตึก — เดินผ่านไม่ได้' : rd.length ? rd.map(o=>`${o.n} Lv.${o.lv}${o.bounty?` 🎯${o.bounty}💎`:''}`).join(', ') : `${MAP_ZONE_NAME[z]} · อันตรายระดับ ${tier}/5`);
+  const tfc = !city && terrAt(x,y);
+  if(tfc && terrDone(tfc)) edges.push(`inset 0 0 0 2px ${terrMine(tfc) ? '#4dff88' : terrColor(tfc.g)}`);
+  const title = `${mapCoord(x,y)} · ` + (city ? MAP_CITY_INFO[z].name : ruin ? 'ซากตึก — เดินผ่านไม่ได้' : tfc ? `${tfc.t==='camp'?'ค่าย':'ธง'}กิล ${tfc.gn} · ❤️${tfc.hp}/${tfc.max}${terrDone(tfc)?'':' (กำลังสร้าง)'}` : warBossAt(x,y) ? 'บอสสงครามกิล!' : rd.length ? rd.map(o=>`${o.n} Lv.${o.lv}${o.bounty?` 🎯${o.bounty}💎`:''}`).join(', ') : `${MAP_ZONE_NAME[z]} · อันตรายระดับ ${tier}/5`);
   return `<div class="${cls.join(' ')}" style="width:${size}px;height:${size}px;background-color:${bg};font-size:${fs}px;${edges.length?`box-shadow:${edges.join(',')};`:''}" title="${esc(title)}" ${adj?`onclick="mapStep(${x-p.x},${y-p.y})"`:''}>${inner}</div>`;
 }
 // แถบทีมบนแผนที่: เลือด + แต้มสเตตัสที่ยังไม่อัป · กดเพื่อเปิดหน้าตัวละคร (อัปสเตตัส/ใส่อุปกรณ์จากกระเป๋าได้แม้อยู่นอกเมือง)
@@ -7693,6 +7953,8 @@ function renderMapPanel(){
       <button onclick="mapStep(0,1)">▼</button>
     </div>
     <div class="row" style="justify-content:center;margin-top:4px;"><button class="${profile.mapAuto?'primary':'ghost'}" style="flex:0 0 auto;" onclick="mapToggleAuto()">⚡ สู้อัตโนมัติเร็ว: ${profile.mapAuto?'เปิด':'ปิด'}</button></div>
+    ${warBossAt(p.x,p.y) ? `<div class="row" style="justify-content:center;margin-top:6px;"><button class="primary" onclick="startWarBattle('${warBossAt(p.x,p.y)}')">🏰 ตีบอสสงครามกิล (เหลือสิทธิ์ ${warAttemptsLeft()})</button></div>` : ''}
+    ${terrPanelHtml(p)}
     <div class="note" style="text-align:center;margin:2px 0 6px;">แตะช่องข้างตัว หรือปุ่มลูกศร (คีย์บอร์ด: ลูกศร/WASD) ${isVip()?' · 👑 VIP เดินทแยงได้ (Q/E/Z/C)':''} · ⚡${MAP_STEP_STAMINA}/ช่อง · ☠️ = มอนสเตอร์ (ย้ายที่ในอีก ${Math.ceil(mapMonLeftMs()/60000)} นาที) · ช่องที่ชนะแล้วว่าง ${MAP_CLEAR_MS/60000} นาที · ⬛ ซากตึกเดินผ่านไม่ได้${mapQLen?' · 🔄 ซิงก์…':''}</div>
     ${radarInfo}
     ${items}
@@ -7717,7 +7979,7 @@ function mapMiniHtml(p){
 
 // ---------- นอกเมือง: ล็อกเมนูอื่น ----------
 const MAP_OUT_TABS = ['battle','team','bag','rank'];
-const MAP_OUT_FUNCS = new Set(['equipGear','unequipGear','discardItem','useHealPotion','useSupplies','useExpPotion','useDropPotion','openMoneyBox','allocateStatPoint',
+const MAP_OUT_FUNCS = new Set(['claimDailyLogin','equipGear','unequipGear','discardItem','useHealPotion','useSupplies','useExpPotion','useDropPotion','openMoneyBox','allocateStatPoint',
   'vetBuyDnaBox','vetBuyRadar','vetMoneyBoxService','vetBuyGold','vetDonate','vetSellGold','claimQuest','useVipBox','openDnaBox']);
 function mapTownBlocked(name){
   if(typeof profile==='undefined' || !profile || inTown()) return false;
