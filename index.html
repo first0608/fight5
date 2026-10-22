@@ -1247,6 +1247,7 @@ function openDevPanel(){
   DEV.on = true;
   renderDevPanel();
   document.getElementById('devOverlay').classList.add('show');
+  if(isOnlineMode() && ON.token) terrRefresh().then(()=>{ if(document.getElementById('devOverlay').classList.contains('show')) renderDevPanel(); });
 }
 function closeDevPanel(){ document.getElementById('devOverlay').classList.remove('show'); }
 function devBtn(label, call, cls=''){ return `<button class="${cls}" style="margin:3px 3px 0 0;padding:7px 10px;font-size:12px;" onclick="${call}">${label}</button>`; }
@@ -1265,6 +1266,7 @@ function renderDevPanel(){
     <div class="panel"><h2>🛠️ โหมดผู้พัฒนา</h2>
       <div class="note" style="margin-top:0;">ใช้ทดสอบเท่านั้น — ทุกปุ่มบันทึกลงบัญชีนี้จริง</div></div>
     ${devMapHtml(sel)}
+    ${devTerrHtml()}
     ${devAdminHtml(sel, itemOpts)}
     <div class="panel"><h2>💰 ทรัพยากร</h2>
       ${devBtn('+1,000🪙',"devDo('coins',1000)")}${devBtn('+100,000🪙',"devDo('coins',100000)")}
@@ -1382,6 +1384,38 @@ function devAdminHtml(sel, itemOpts){
     <div class="note">ของที่ส่งจะไปอยู่ในชีท "🎁 ส่งของ" (ดู/แก้ย้อนหลังได้) · ผู้เล่นได้รับตอนเข้าเกมหรือภายใน ~2 นาที</div>
   </div>`;
 }
+function devTerrHtml(){
+  const me = TERR.me, p = mapPos(), f = p.city ? null : terrAt(p.x,p.y);
+  const b = (label, call, cls='') => devBtn(label, call, cls);
+  return `<div class="panel"><h2>🚩 ทดสอบระบบกิล · ยึดพื้นที่</h2>
+    <div style="font-size:12px;line-height:1.6;">${me ? `กิล <b>${esc(me.name)}</b> Lv.${me.lv} · ธง ${me.flags}/${me.max} · ค่าย ${me.camp?mapCoord(me.camp.x,me.camp.y):'—'}<br>คลังวัสดุ 🧱 ${me.mat?me.mat.c:0} · 🔩 ${me.mat?me.mat.r:0} · ค่าบำรุง/วัน 🧱 ${me.upkeep?me.upkeep.c:0} · 🔩 ${me.upkeep?me.upkeep.r:0}` : '⚠️ ยังไม่อยู่ในกิล (สร้าง/เข้ากิลก่อน)'}<br>
+      ยืนอยู่ ${mapCoord(p.x,p.y)} ${f ? `· ${f.t==='camp'?'⛺':'🚩'} ${esc(f.gn)} ❤️${f.hp}/${f.max}${terrDone(f)?'':' (กำลังสร้าง)'}${f.imm>terrNow()?' 🛡️อมตะ':''}` : p.city ? '(ในเมือง)' : '(ช่องว่าง)'}</div>
+    <div style="margin-top:6px;font-weight:700;font-size:12px;">วาง (เสร็จทันที ไม่หักวัสดุ ไม่เช็กกติกาต่อธง) ที่ช่องที่ยืน</div>
+    ${b('⛺ ค่ายกิลเรา',"devTerrDo('placeMine','camp')")}${b('🚩 ธงกิลเรา',"devTerrDo('placeMine','flag')")}
+    ${b('🧪⛺ ค่ายกิลทดสอบ (ศัตรู)',"devTerrDo('placeEnemy','camp')")}${b('🧪🚩 ธงกิลทดสอบ (ศัตรู)',"devTerrDo('placeEnemy','flag')")}
+    <div style="margin-top:6px;font-weight:700;font-size:12px;">เวลา · เลือด</div>
+    ${b('⏩ สร้างเสร็จทันทีทั้งหมด',"devTerrDo('finish')",'primary')}${b('🛡️ ล้างอมตะทั้งหมด',"devTerrDo('noImm')")}${b('🔧 ซ่อมได้ทันที',"devTerrDo('noRep')")}
+    ${b('❤️ เลือดช่องนี้ = 1',"devTerrDo('hp',null,1)")}${b('💀 เลือดช่องนี้ = 0',"devTerrDo('hp',null,0)")}${b('❤️ เต็ม',"devTerrDo('hp',null,99)")}
+    <div style="margin-top:6px;font-weight:700;font-size:12px;">วัสดุ · ค่าบำรุง · แต้ม</div>
+    ${b('🧱 +200 ปูน/เหล็กเส้น เข้ากระเป๋า',"devDo('terrBag')")}${b('🏦 +1,000 เข้าคลังวัสดุกิล',"devTerrDo('mat')")}${b('0️⃣ ล้างคลังวัสดุกิล',"devTerrDo('matZero')")}
+    ${b('📅 เก็บค่าบำรุง 1 วันตอนนี้',"devTerrDo('upkeep')")}${b('🏆 +แต้มครอบครอง 1 ชม.',"devTerrDo('pts')")}${b('🌀 รีเซ็ตคูลดาวน์วาร์ป',"devTerrDo('warpReset')")}
+    ${b('📖 +1,000 EXP กิล',"devDo('gexp')")}
+    <div style="margin-top:6px;font-weight:700;font-size:12px;">ล้าง</div>
+    ${b('🗑️ ลบของกิลทดสอบ',"devTerrDo('clearTest')")}${b('🗑️ ลบค่าย/ธงกิลเราทั้งหมด',"devTerrDo('clearMine')")}
+    <div class="note">ทดสอบตีธง: วางธงกิลเรา 1 ช่อง → เดินไปช่องข้างๆ → วางธงกิลทดสอบ → เดินกลับมาแล้วเข้าไปช่องธงศัตรู กด "ตีธง" ในกล่องใต้แผนที่ · ทดสอบผู้ป้องกัน: ให้บัญชีที่ 2 (กิลอื่น) มายืนในช่องธงกิลเรา แล้วใช้อีกบัญชีตี · ทดสอบบอสสงครามบนแผนที่: ใช้ปุ่ม "เปิดสงครามทันที" ด้านล่าง</div>
+  </div>`;
+}
+async function devTerrDo(op, kind, v){
+  if(!devAllowed()) return;
+  if(!isOnlineMode() || !ON.token){ showToast('ต้องออนไลน์'); return; }
+  if(op==='clearMine' && !confirm('ลบค่ายและธงของกิลเราทั้งหมด?')) return;
+  await mapQ;
+  let r; try{ r = await onlineRpc({ a:'devTerr', t:ON.token, op, kind, v }); }catch(e){ r = { ok:false, error:'เชื่อมต่อไม่ได้' }; }
+  if(!r || !r.ok){ showToast('🛠️ '+((r&&r.error)||'ไม่สำเร็จ')); return; }
+  terrApply(r);
+  renderAll(); renderDevPanel();
+  if(r.msg) showToast('🛠️ '+r.msg);
+}
 async function devMapDo(op, zone, kind){
   if(!devAllowed()) return;
   if(!isOnlineMode() || !ON.token){ showToast('ต้องออนไลน์'); return; }
@@ -1473,6 +1507,8 @@ async function devDo(kind, arg){
     case 'noEnc': DEV.noEnc = !DEV.noEnc; msg = `ไม่เจอศัตรูช่องปกติ: ${DEV.noEnc?'เปิด':'ปิด'} (บอส/ทหาร/ผู้เล่นยังเจอ)`; break;
     case 'mapClearCells': profile.mapCleared = {}; msg = 'ล้างช่องที่เคลียร์แล้ว'; break;
     case 'mapRadarOff': profile.mapRadar = null; msg = 'ล้างผลเรดาห์แล้ว'; break;
+    case 'terrBag': { const a = addItem('cement',200), b2 = addItem('rebar',200); await saveBagItems(); await saveWarehouseItems(); msg = (a&&b2) ? '+200 ปูน · +200 เหล็กเส้น' : 'กระเป๋า/ตู้เซฟเต็ม'; break; }
+    case 'gexp': { if(!profile.guildId){ showToast('ต้องอยู่ในกิลก่อน'); return; } await addLedger(profile.guildId, { t:'dev', pid:profile.playerId, name:profile.playerName, gexp:1000 }); await refreshGuildData(true); msg = '+1,000 EXP กิล (ใช้อัปเลเวลกิลเพื่อเพิ่มจำนวนธง)'; break; }
     case 'god': DEV.god = !DEV.god; msg = `อมตะ: ${DEV.god?'เปิด':'ปิด'}`; break;
     case 'dmg': DEV.dmgMult = DEV.dmgMult===1 ? 10 : DEV.dmgMult===10 ? 100 : 1; msg = `ดาเมจเรา x${DEV.dmgMult}`; break;
     case 'pipe': profile.pipeTickets = (profile.pipeTickets||0) + 1; msg=`+1 บัตรลงด่านท่อน้ำ (มี ${profile.pipeTickets} ใบ)`; break;
@@ -2509,9 +2545,9 @@ const LOGIN_DEFAULT = {
     { dnaGrade:'SS', dnaQty:1 },
   ],
   m: Array.from({length:31}, (_,i)=>{ const d = i+1;
-    if(d===7) return { dia:50, dnaBox:1 }; if(d===14) return { dia:80, partBox:1 }; if(d===21) return { dia:100, dnaBox:1 };
-    if(d===28) return { dnaGrade:'S', dnaQty:1 }; if(d===31) return { dia:150, item:'money_box', qty:2 };
-    return d%2 ? { coins:1000, item:'heal_potion', qty:2 } : { dia:10, item:'oil', qty:1 }; }),
+    if(d===7) return { dia:10, item:'money_box', qty:1 }; if(d===14) return { dia:16, partBox:1 }; if(d===21) return { dia:20, item:'money_box', qty:1 };
+    if(d===28) return { dnaGrade:'S', dnaQty:1 }; if(d===31) return { dia:30, item:'money_box', qty:2 };
+    return d%2 ? { coins:1000, item:'heal_potion', qty:2 } : { dia:2, item:'oil', qty:1 }; }),
 };
 function loginCfg(){ const l = GCFG && GCFG.login; return { s: (l && l.s && l.s.length) ? l.s : LOGIN_DEFAULT.s, m: (l && l.m && l.m.length) ? l.m : LOGIN_DEFAULT.m }; }
 function todayStr(){
@@ -5161,7 +5197,8 @@ async function donateToGuild(kind){
 }
 // 🧱 บริจาคปูน/เหล็กเส้น → คลังวัสดุกิล (เซิร์ฟเวอร์) + แต้มกิล
 function guildMatInfoHtml(){
-  const me = TERR.me; if(!me || !me.mat) return `<div class="note" style="margin:0;">คลังวัสดุกิล: เปิดแผนที่เพื่อโหลดข้อมูล</div>`;
+  const me = TERR.me;
+  if(!me || !me.mat){ if(!TERR.loadingMat && isOnlineMode() && ON.token && Date.now()-(TERR.matTry||0) > 30000){ TERR.loadingMat = true; TERR.matTry = Date.now(); terrRefresh().finally(()=>{ TERR.loadingMat = false; }); } return `<div class="note" style="margin:0;">คลังวัสดุกิล: กำลังโหลด…</div>`; }
   const u = me.upkeep || {c:0,r:0};
   const days = (u.c||u.r) ? Math.min(u.c ? Math.floor(me.mat.c/u.c) : Infinity, u.r ? Math.floor(me.mat.r/u.r) : Infinity) : null;
   return `<div class="note" style="margin:0;">คลังวัสดุกิล: 🧱 ${me.mat.c.toLocaleString()} · 🔩 ${me.mat.r.toLocaleString()} · ค่าบำรุงวันละ 🧱 ${u.c} · 🔩 ${u.r}${days!=null?` · <b style="color:${days<2?'var(--bad)':'var(--good)'}">พอจ่ายอีก ${days} วัน</b>`:''}</div>`;
@@ -5536,6 +5573,8 @@ function renderMyGuildPanel(){
     <div class="panel">
       <h2>💰 คลังกิล</h2>
       <div class="row" style="font-size:13px;font-weight:700;"><div>💎 ${t.dia.toLocaleString()}</div><div>🪙 ${t.coin.toLocaleString()}</div><div>📦 ${t.objs.length} ชิ้น</div></div>
+      <div class="row" style="font-size:13px;font-weight:700;margin-top:4px;"><div>🧱 ปูน ${TERR.me&&TERR.me.mat ? TERR.me.mat.c.toLocaleString() : '…'}</div><div>🔩 เหล็กเส้น ${TERR.me&&TERR.me.mat ? TERR.me.mat.r.toLocaleString() : '…'}</div></div>
+      ${guildMatInfoHtml()}
       <div class="note" style="color:var(--bad);">⏳ ของในคลัง (ชิ้นส่วน/DNA/อุปกรณ์/ไอเทม) อยู่ได้ 3 วัน เกินแล้วจะหายไปกลายเป็น EXP กิล</div>
       <div class="note">ใช้แต้มกิลแลกของในคลัง — แต้มได้จากการบริจาคและลงสงครามกิล (${WAR_PTS_BASE} แต้ม/ครั้ง + 1 แต้มทุก ${WAR_DMG_PER_PT} ดาเมจ)<br>
         ราคาชิ้นส่วน: D/C/B ${GUILD_OBJ_PTS.D} · A ${GUILD_OBJ_PTS.A} · S ${GUILD_OBJ_PTS.S} · SS ${GUILD_OBJ_PTS.SS} · SSS ${GUILD_OBJ_PTS.SSS} แต้ม<br>
@@ -7682,7 +7721,7 @@ function terrColor(gid){ let h = 0; for(const ch of String(gid)) h = (h*31 + ch.
 function terrMinLeft(t){ return Math.max(1, Math.ceil((t - terrNow())/60000)); }
 async function terrRefresh(){
   if(!isOnlineMode() || !ON.token) return;
-  try{ const r = await onlineRpc({ a:'terrState', t:ON.token }); if(r && r.ok){ terrApply(r); if(!battleActive && curTab==='battle') renderMapPanel(); } }catch(e){}
+  try{ const r = await onlineRpc({ a:'terrState', t:ON.token }); if(r && r.ok){ terrApply(r); if(!battleActive && curTab==='battle') renderMapPanel(); if(curTab==='guild') renderGuildTab(); } }catch(e){}
 }
 setInterval(()=>{ if(profile && curTab==='battle' && !battleActive && document.visibilityState!=='hidden') terrRefresh(); }, 60000);
 function terrPanelHtml(p){
