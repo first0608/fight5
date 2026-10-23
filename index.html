@@ -1487,7 +1487,7 @@ async function devDo(kind, arg){
   switch(kind){
     case 'coins': profile.coins += arg; msg = `+${arg.toLocaleString()} เหรียญ`; break;
     case 'dia': profile.diamonds += arg; msg = `+${arg.toLocaleString()} เพชร`; break;
-    case 'stamina': profile.stamina = profile.staminaMax; break;
+    case 'stamina': profile.stamina = staMax(); break;
     case 'stamina30': profile.stamina += 30; break;
     case 'heal': all().forEach(c=>{ c.currentHp = c.stats.hp; }); await saveRoster(); msg='ฮีลทุกตัวแล้ว'; break;
     case 'level':
@@ -1733,7 +1733,7 @@ function renderGuide(){
     • มอนสเตอร์มีเลเวลตามด่าน สเตตัสโตต่อเลเวล HP +${ENEMY_LV_GROWTH.hp*100}% · ATK +${ENEMY_LV_GROWTH.atk*100}% · DEF +${ENEMY_LV_GROWTH.def*100}% · SPD +${ENEMY_LV_GROWTH.spd*100}%<br>
     • ตัวละครเลเวลเกินมอนสูงสุดของด่านเกิน ${EXP_OVERLEVEL_FREE} เลเวล ได้ EXP ลดลง ${EXP_OVERLEVEL_STEP*100}% ต่อเลเวล (เหลืออย่างน้อย 10%)<br>
     • ⚡ สู้อัตโนมัติเร็ว ใช้ได้ทุกคน (ตีเองเร็ว ~6 เท่า · บนแผนที่เปิดค้างได้ ชนะแล้วกลับแผนที่ให้เอง)<br>
-    • 👑 แพ็ค VIP (${VIP_PRICE}💎/${VIP_DAYS} วัน): ↗️ เดินแนวทแยงบนแผนที่ได้ (ไปได้ทั้ง 8 ช่องรอบตัว ⚡1)<br>
+    • 👑 แพ็ค VIP (${VIP_PRICE}💎/${VIP_DAYS} วัน): ↗️ เดินแนวทแยงบนแผนที่ · ⚡ สเตมิน่าสูงสุด ${VIP_STAMINA_MAX} ฟื้นเร็วขึ้น ${VIP_REGEN_PCT}% · ✨ ดรอป +${VIP_DROP_PCT}% · 📖 EXP +${VIP_EXP_PCT}% · 🏦 ดอกเบี้ยเพชรในคลัง ${VIP_VAULT_INT_PCT}%/วัน<br>
     • ทุกรอบเรียงลำดับตาม SPD สูงตีก่อน · เลือดต่อเนื่องจากไฟต์ก่อน (ไม่ฟื้นเอง ต้องใช้น้ำยา)<br>
     • คริติคอลสูงสุด 70% (เกินจะเพิ่มแรงคริแทน) · หลบสูงสุด 70% (เกินจะสวนกลับ) · DEF% สูงสุด 80% (เกินจะสะท้อนดาเมจ)<br>
     • พิษ: เสียเลือดตามเปอร์เซ็นต์ทุกเทิร์น และ ATK -10% ระหว่างติดพิษ<br>
@@ -1760,7 +1760,7 @@ function renderGuide(){
     • 🟥 ตัวแดง: ดักเกิน ${PVP_RED_AFTER} ครั้ง/วัน → ถ้าแพ้ยกทีม โอกาสของตก x2 (รีเซ็ต 00:00 น.)<br>
     • 👑 VIP ล็อกของที่สวมใส่ได้ 1 ชิ้น (DNA / ชิ้นส่วน / อุปกรณ์) ชิ้นนั้นจะไม่ตกทั้งตอนแพ้และตอนโดนดัก
     <b>⚔️ รางวัลการสังหาร:</b>
-    ${gTable(['อันดับ','รายวัน','รายเดือน'], KILL_REWARD_TABLE.kd.map((r,i)=>{ const m=KILL_REWARD_TABLE.km[i]; return [r[0], `💎${r[1]} · 🪙${r[2].toLocaleString()}`, `💎${m[1]} · 🪙${m[2].toLocaleString()}${m[3]?` · 🧬x${m[3]}`:''}`]; }))}
+    ${gTable(['อันดับ','รายวัน','รายเดือน'], KILL_REWARD_TABLE.kd.map((r,i)=>{ const m=KILL_REWARD_TABLE.km[i]; return [r[0], `💎${r[1]} · 🪙${r[2].toLocaleString()}`, `💎${m[1]} · 🪙${m[2].toLocaleString()}${m[3]?` · 🦴x${m[3]}`:''}`]; }))}
     ระหว่างต่อสู้ใช้เมนู/ฟังก์ชันอื่นไม่ได้ (ต้องปิดไฟต์ก่อน) · ตลาดผู้เล่นตั้งราคาขั้นต่ำ ${MKT_MIN_PRICE} เพชร`));
   secs.push(gSec('🏆 แข่งขัน: อารีน่า · บอสโลก · หอคอย · ค่าหัว · แชท', `
     <b>⚔️ อารีน่า:</b> สู้กับทีมของผู้เล่นอื่น (AI ควบคุม) วันละ ${cfgSet('arena_daily')} ครั้ง (ซื้อเพิ่ม ${cfgSet('arena_extra_price')}💎/ครั้ง) · เรตติ้งเริ่ม 1000 ชนะ/แพ้ ได้/เสียแต้มตามความต่างเรต · ซีซันจบทุกวันจันทร์ แจกรางวัลท็อป 10 · ไม่มีของตก ไม่เสียเลือดจริง<br>
@@ -2374,14 +2374,16 @@ async function saveBagItems(){ return safeStorageSet('bagItems', JSON.stringify(
 async function saveWarehouseItems(){ return safeStorageSet('warehouseItems', JSON.stringify(warehouseItems)); }
 
 
+function staMax(){ return (typeof isVip==='function' && isVip()) ? Math.max(profile.staminaMax||30, VIP_STAMINA_MAX) : (profile.staminaMax||30); }
 function applyStaminaRegen(){
   const now = Date.now();
-  const REGEN_MS = 2*60*1000; // +1 ทุก 2 นาที
+  const REGEN_MS = Math.round(2*60*1000 / ((typeof isVip==='function' && isVip()) ? 1 + VIP_REGEN_PCT/100 : 1)); // +1 ทุก 2 นาที (VIP เร็วขึ้น 20%)
   if(!profile.lastTs) profile.lastTs = now;
+  if(profile.stamina >= staMax()){ profile.lastTs = now; return; }   // เต็มแล้ว: เริ่มนับใหม่ตอนใช้
   const elapsed = now - profile.lastTs;
   const ticks = Math.floor(elapsed / REGEN_MS);
-  if(ticks > 0 && profile.stamina < profile.staminaMax){
-    profile.stamina = Math.min(profile.staminaMax, profile.stamina + ticks);
+  if(ticks > 0){
+    profile.stamina = Math.min(staMax(), profile.stamina + ticks);
     profile.lastTs += ticks*REGEN_MS;
     saveProfile();
   }
@@ -2783,7 +2785,7 @@ async function redeemCode(){
 function renderHud(){
   document.getElementById('hudCoin').textContent = Math.floor(profile.coins);
   document.getElementById('hudDiamond').textContent = Math.floor(profile.diamonds);
-  document.getElementById('hudStamina').textContent = profile.stamina+'/'+profile.staminaMax;
+  document.getElementById('hudStamina').textContent = profile.stamina+'/'+staMax();
   renderTeamHp();
 }
 function gradeBadge(grade){
@@ -4242,9 +4244,9 @@ async function endBattle(result){
 
     // มอบ EXP ให้ตัวละครที่ลงสู้จริง + แจ้งเลเวลอัพ (ยาคูณ EXP: ถ้าเปิดใช้ไว้ จะได้ x2 แล้วถูกใช้หมดไปหลังไฟต์นี้)
     const expBoosted = !!profile.expBoostActive;
-    const gExpPct = myGuildBonus().exp || 0;   // อัปเกรดกิล: EXP ตัวละคร +%
+    const gExpPct = (myGuildBonus().exp || 0) + (isVip() ? VIP_EXP_PCT : 0);   // อัปเกรดกิล + 👑 VIP: EXP ตัวละคร +%
     const expReward = Math.round((expBoosted ? stage.expReward*2 : stage.expReward) * (1 + gExpPct/100));
-    if(gExpPct) logLine('sys', `🏰 โบนัสกิล EXP +${gExpPct}%`);
+    if(gExpPct) logLine('sys', `${isVip()?'👑':'🏰'} โบนัส EXP +${gExpPct}%`);
     const myFighters = battleUnits.filter(u=>u.side==='me' && !u.isMinion).map(u=>u.char);
     myFighters.forEach(ch=>{
       const pointsBefore = ch.unspentPoints||0;
@@ -4308,9 +4310,9 @@ async function endBattle(result){
     const gDropPct = myGuildBonus().drop || 0;   // อัปเกรดกิล: โอกาสได้ของเพิ่ม 1 กลุ่ม
     const gDropProc = gDropPct>0 && Math.random()*100 < gDropPct;
     if(gDropProc) logLine('sys', `🏰 โบนัสกิล: ได้ของเพิ่ม 1 กลุ่ม!`);
-    const sqPct = sqBonusPct();   // เควสเซิร์ฟเวอร์สำเร็จ: อัตราดรอปเพิ่ม
+    const sqPct = sqBonusPct() + (isVip() ? VIP_DROP_PCT : 0);   // เควสเซิร์ฟเวอร์สำเร็จ + 👑 VIP: อัตราดรอปเพิ่ม
     const sqProc = sqPct>0 && Math.random()*100 < sqPct;
-    if(sqProc) logLine('sys', `🏗️ โบนัสเควสเซิร์ฟเวอร์: ได้ของเพิ่ม 1 กลุ่ม!`);
+    if(sqProc) logLine('sys', sqBonusPct()>0 ? `🏗️ โบนัสเควสเซิร์ฟเวอร์/VIP: ได้ของเพิ่ม 1 กลุ่ม!` : `👑 โบนัส VIP: ได้ของเพิ่ม 1 กลุ่ม!`);
     const groupCount = Math.min(4, DROP_BASE_GROUPS + (dropBoosted ? 1 : 0) + (gDropProc ? 1 : 0) + (sqProc ? 1 : 0));
     let remainingPool = groupWeights.slice();
     const chosenGroups = [];
@@ -5797,7 +5799,15 @@ function thDayKey(ts){ const d = new Date((ts||Date.now()) + 7*3600000); return 
 function getVault(){
   if(!profile.diaVault) profile.diaVault = { bal:0, day:thDayKey(), dep:0, wd:0 };
   const v = profile.diaVault;
-  if(v.day !== thDayKey()){ v.day = thDayKey(); v.dep = 0; v.wd = 0; }
+  if(v.day !== thDayKey()){
+    // 👑 VIP: ดอกเบี้ยเพชรในคลัง 0.5% ต่อวัน (ทบต้น คิดย้อนได้สูงสุด 30 วัน)
+    if(isVip() && v.bal > 0){
+      const days = Math.max(1, Math.min(30, Math.round((Date.parse(thDayKey()) - Date.parse(v.day)) / 86400000) || 1));
+      let gain = 0; for(let i=0;i<days;i++){ const g = Math.floor((v.bal + gain) * VIP_VAULT_INT_PCT / 100); gain += g; }
+      if(gain > 0){ v.bal += gain; v.lastInt = gain; setTimeout(()=>{ try{ showToast(`👑 ดอกเบี้ยคลังเพชร +${gain}💎`); }catch(e){} }, 1500); }
+    }
+    v.day = thDayKey(); v.dep = 0; v.wd = 0;
+  }
   return v;
 }
 function msToThMidnight(){ const t = Date.now()+7*3600000; return 86400000 - (t % 86400000); }
@@ -5842,13 +5852,15 @@ async function vaultWithdraw(){
 // 👑 แพ็ค VIP — 1500 เพชร / 30 วัน · ⚡ สู้อัตโนมัติเร็ว
 // =====================================================================
 const VIP_PRICE = 1500, VIP_DAYS = 30;
+// 👑 สิทธิ์ VIP: สเตมิน่าสูงสุด 60 · ฟื้นเร็วขึ้น 20% · ดรอป +5% · EXP +10% · ดอกเบี้ยเพชรในคลัง 0.5%/วัน
+const VIP_STAMINA_MAX = 60, VIP_REGEN_PCT = 20, VIP_DROP_PCT = 5, VIP_EXP_PCT = 10, VIP_VAULT_INT_PCT = 0.5;
 function isVip(){ return (profile && profile.vipUntil||0) > Date.now(); }
 function fmtThDate(t){ const d=new Date(t+7*3600000); return `${d.getUTCDate()}/${d.getUTCMonth()+1}/${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`; }
 function renderVipPanel(){
   const el = document.getElementById('vipPanel'); if(!el || !profile) return;
   const on = isVip();
   el.innerHTML = `<h2>👑 แพ็ค VIP</h2>
-    <div class="note">สิทธิ์ VIP: <b>↗️ เดินแนวทแยงบนแผนที่</b> (8 ทิศ ⚡1) · 🔒 ล็อกของที่สวมใส่ 1 ชิ้น · 🏦 ฝาก/ถอนคลังเพชรได้วันละ ${VAULT_DAILY_LIMIT_VIP} (ปกติ ${VAULT_DAILY_LIMIT})</div>
+    <div class="note">สิทธิ์ VIP: <b>↗️ เดินแนวทแยงบนแผนที่</b> (8 ทิศ ⚡1) · ⚡ สเตมิน่าสูงสุด ${VIP_STAMINA_MAX} · ฟื้นเร็วขึ้น ${VIP_REGEN_PCT}% · ✨ ดรอป +${VIP_DROP_PCT}% · 📖 EXP +${VIP_EXP_PCT}% · 🏦 ดอกเบี้ยเพชรในคลัง ${VIP_VAULT_INT_PCT}%/วัน · 🔒 ล็อกของที่สวมใส่ 1 ชิ้น · 🏦 ฝาก/ถอนคลังเพชรได้วันละ ${VAULT_DAILY_LIMIT_VIP} (ปกติ ${VAULT_DAILY_LIMIT})</div>
     <div class="part-pick-item"><div>${on ? `✅ VIP ใช้งานอยู่ ถึง <b>${fmtThDate(profile.vipUntil)}</b>` : 'ยังไม่ได้เป็น VIP'}<div class="note" style="margin:2px 0 0;">${VIP_PRICE}💎 / ${VIP_DAYS} วัน · ซื้อซ้ำ = ต่ออายุเพิ่ม ${VIP_DAYS} วัน</div></div>
       <button class="diamond" onclick="buyVip()" ${profile.diamonds<VIP_PRICE?'disabled':''}>${on?'ต่ออายุ':'ซื้อ'} · ${VIP_PRICE}💎</button></div>
     <div class="note" style="margin-top:8px;">🔒 <b>ล็อกของที่สวมใส่ 1 ชิ้น</b> (DNA ที่ติดตั้ง / ชิ้นส่วนอวัยวะ / อุปกรณ์) — ชิ้นที่ล็อกจะไม่ตกเมื่อแพ้ยกทีมหรือโดนดัก${on?'':' (เฉพาะ VIP)'}</div>
@@ -5942,6 +5954,7 @@ async function onlineTick(){
         profile.coins += w.coin||0;
         let boxTxt = '';
         for(let i=0;i<(w.dnaBox||0);i++){ if(dnaPackages.length<DNA_CAP){ dnaPackages.push(rollDNAPackage('diaW')); boxTxt = ` · 🧬 กล่องสุ่ม DNA เพชร x${w.dnaBox}`; } }
+        for(let i=0;i<(w.partBox||0);i++){ if(partsInBag()<PARTS_CAP){ parts.push(makePart('diaW')); boxTxt = ` · 🦴 กล่องสุ่มอวัยวะเพชร x${w.partBox}`; } }
         lines.push(`🏆 อันดับ ${w.rank} ${LB_TITLE[w.ty]||w.ty} (${Number(w.p).toLocaleString()} ${LB_UNIT[w.ty]||''}) → 💎 ${w.dia} · 🪙 ${(w.coin||0).toLocaleString()}${boxTxt}`);
         return;
       }
@@ -5963,8 +5976,14 @@ async function onlineTick(){
     for(const x of (r.warWeekReward||[])){
       profile.diamonds += x.dia||0; profile.coins += x.coin||0;
       if(x.pts || x.gexp) await addLedger(x.gid, { t:'warweek', pid:profile.playerId, name:profile.playerName, zone:x.zone, pts:x.pts||0, gexp:x.gexp||0 });
-      lines.push(`🏰 กิล "${esc(x.gname)}" ครอง${esc(zoneName(x.zone))}ประจำสัปดาห์ (${(x.pts!=null?x.pts:x.hours)} แต้ม) → 💎 ${x.dia} · 🪙 ${(x.coin||0).toLocaleString()} · แต้มกิล +${x.pts}${x.gexp?` · EXP กิล +${x.gexp}`:''}`);
+      let pb = 0; for(let i=0;i<(x.partBox||0);i++){ if(partsInBag()<PARTS_CAP){ parts.push(makePart('diaW')); pb++; } }
+      const vb = x.vipBox ? (addItem('vip_box_1d', x.vipBox) ? x.vipBox : 0) : 0;
+      const bits = [];
+      if(x.dia) bits.push(`💎 ${x.dia}`); if(x.coin) bits.push(`🪙 ${x.coin.toLocaleString()}`); if(x.pts) bits.push(`แต้มกิล +${x.pts}`); if(x.gexp) bits.push(`EXP กิล +${x.gexp}`);
+      if(pb) bits.push(`🦴 กล่องสุ่มอวัยวะเพชร x${pb}`); if(vb) bits.push(`👑 กล่อง VIP 1 วัน x${vb}`);
+      lines.push(`🏰 กิล "${esc(x.gname)}" อันดับ ${x.rank||1} ครอบครอง${esc(zoneName(x.zone))}ประจำสัปดาห์ (${(x.score!=null?x.score:x.hours)} แต้ม) → ${bits.join(' · ')}`);
     }
+    if((r.warWeekReward||[]).length){ await saveParts(); await saveBagItems(); await saveWarehouseItems(); }
     if(r.bountySurvive && r.bountySurvive.amt>0){ profile.diamonds += r.bountySurvive.amt; lines.push(`🛡️ รอดจากค่าหัว ${r.bountySurvive.total.toLocaleString()}💎 ครบเวลา! ได้รับ 💎 ${r.bountySurvive.amt.toLocaleString()}`); }
     (r.arenaNotes||[]).forEach(x=>{ lines.push(x.win ? `🛡️ ทีมของคุณป้องกันอารีน่าจาก ${esc(x.by)} สำเร็จ (เรต +${x.d})` : `⚔️ ${esc(x.by)} ชนะทีมของคุณในอารีน่า (เรต ${x.d})`); });
     if(r.sq){
@@ -6027,7 +6046,7 @@ function renderWarHoldRank(el, chips){
   const d = whView.data;
   const sec = (tbl)=> WAR_ZONES.map(z=>{
     const rows = (tbl && tbl[z]) || []; const rw = d && d.rewards[z];
-    return `<div class="panel" style="margin-bottom:10px;"><div class="hdr-row"><h2>${esc(zoneName(z))}</h2>${rw?`<span class="note" style="margin:0;">🏆 💎${rw.dia} · 🪙${rw.coin.toLocaleString()} · แต้มกิล ${rw.pts} · EXP กิล ${rw.gexp}</span>`:''}</div>
+    return `<div class="panel" style="margin-bottom:10px;"><div class="hdr-row"><h2>${esc(zoneName(z))}</h2>${rw?`<span class="note" style="margin:0;">🥇 💎${rw.dia} · 🪙${rw.coin.toLocaleString()} · แต้มกิล ${rw.pts} · EXP กิล ${rw.gexp} · 🥇🥈🥉 🦴 กล่องอวัยวะ x${cfgSet('wh_part_box')} + 👑 VIP 1 วัน x${cfgSet('wh_vip_box')} (ต่อคน)</span>`:''}</div>
       ${rows.length ? rows.slice(0,5).map((x,i)=>`<div class="lb-row ${profile.guildId===x.gid?'me':''}"><span>${i===0?'👑':'#'+(i+1)} ${esc(x.n||'-')}</span><b>${(x.p!=null?x.p:x.h).toLocaleString()} แต้ม</b></div>`).join('') : '<div class="empty-msg" style="padding:8px;">ยังไม่มีกิลครอง</div>'}</div>`;
   }).join('');
   el.innerHTML = `<div class="panel"><h2>🏆 แต้มครอบครองโซนประจำสัปดาห์</h2><div style="margin:6px 0;">${chips}</div>
@@ -6062,7 +6081,7 @@ function renderRank(){
     }).join('') : `<div class="empty-msg">ยังไม่มีใครติดอันดับในรอบนี้</div>`;
     body = head + me + `<div style="margin-top:8px;">${list}</div>`;
   }
-  const rw = isKill ? KILL_REWARD_TABLE[lbView.ty].map(r=>[`อันดับ ${r[0]}`, `💎 ${r[1].toLocaleString()} · 🪙 ${r[2].toLocaleString()}${r[3]?` · 🧬 กล่องDNAเพชร x${r[3]}`:''}`])
+  const rw = isKill ? KILL_REWARD_TABLE[lbView.ty].map(r=>[`อันดับ ${r[0]}`, rewardTxt(r, lbView.ty)])
     : LB_REWARD_TABLE[lbView.ty].map(r=>[`อันดับ ${r[0]}`, `💎 ${r[1].toLocaleString()} · 🎒 ${r[2]}`]);
   el.innerHTML = `<div class="panel">
       <h2>🏆 ${LB_TITLE[lbView.ty]}</h2>
@@ -6728,7 +6747,7 @@ const GCFG_DEFAULT = {
   ],
   set: { bounty_hunt_pct:60, bounty_survive_pct:20, bounty_hours:24, tw_min_floor:30, sq_cement:10000, sq_rebar:10000, sq_points:100, sq_dia:250, sq_drop_pct:20, sq_drop_days:7,
          gold_drop_ruins:0.1, gold_drop_pipe:0.5, build_drop_hospital:30, build_drop_school:40, build_drop_campground:50,
-         build_drop_ruins:60, build_drop_pipe:80, build_drop_max:3, vet_gold_sell:1000, pvp_hunt_dia:20, pvp_hunt_cap:1000,
+         build_drop_ruins:60, build_drop_pipe:80, build_drop_max:3, vet_gold_sell:1000, pvp_hunt_dia:20, pvp_hunt_cap:1000, wh_part_box:1, wh_vip_box:3,
          map_step_stamina:1, map_clear_min:5, map_hint_r:1, map_boss_min:30, map_vet_min:30, map_boss_dist:6, map_delivery_cost:2000, map_delivery_qty:1, map_radar_steps:5,
          map_pvp_hospital:0, map_pvp_school:1, map_pvp_campground:1, map_pvp_ruins:1,
          map_boss_hospital_dia:20, map_boss_hospital_coin:1500, map_boss_hospital_exp:150, map_boss_school_dia:40, map_boss_school_coin:3000, map_boss_school_exp:400,
@@ -7086,7 +7105,8 @@ function renderArena(){
     <div class="panel"><h2>🎁 รางวัลซีซัน (ทุกวันจันทร์)</h2>${gTable(['อันดับ','รางวัล'], KILL_REWARD_TABLE.ar.map(r=>[`อันดับ ${r[0]}`, rewardTxt(r)]))}
       <div class="note">ระดับ: ${ARENA_TIERS.slice().reverse().map(x=>`${x[1]} ${x[2]} ${x[0]}+`).join(' · ')} · เริ่มซีซันใหม่ที่ 1000</div></div>`;
 }
-function rewardTxt(r){ return `💎 ${r[1].toLocaleString()} · 🪙 ${r[2].toLocaleString()}${r[3]?` · 🧬 กล่อง DNA เพชร x${r[3]}`:''}`; }
+const PART_BOX_TYS = ['km','tw','wb'];   // รางวัลอันดับที่ให้กล่องสุ่มอวัยวะเพชรแทนกล่อง DNA
+function rewardTxt(r, ty){ return `💎 ${r[1].toLocaleString()} · 🪙 ${r[2].toLocaleString()}${r[3]?(PART_BOX_TYS.includes(ty)?` · 🦴 กล่องสุ่มอวัยวะเพชร x${r[3]}`:` · 🧬 กล่อง DNA เพชร x${r[3]}`):''}`; }
 async function arenaBuy(){
   const price = cfgSet('arena_extra_price');
   if(profile.diamonds < price){ showToast('เพชรไม่พอ'); return; }
@@ -7164,7 +7184,7 @@ function renderWb(){
       <div class="note">ใช้ทีมที่ยืนยันไว้ เลือดเต็ม ไม่เสียเลือดจริง · สู้ได้สูงสุด ${wbRounds(d)} รอบหรือจนทีมล้ม ดาเมจทั้งหมดหักเลือดบอสของทั้งเซิร์ฟ · บอสตาย = ทุกคนที่ร่วมตีได้รางวัล</div>
     </div>
     <div class="panel"><h2>🏅 อันดับดาเมจสัปดาห์นี้</h2>${top||'<div class="empty-msg">ยังไม่มีใครตีบอส</div>'}
-      <div style="margin-top:10px;">${gTable(['อันดับ','รางวัลรายสัปดาห์'], KILL_REWARD_TABLE.wb.map(r=>[`อันดับ ${r[0]}`, rewardTxt(r)]))}</div></div>`;
+      <div style="margin-top:10px;">${gTable(['อันดับ','รางวัลรายสัปดาห์'], KILL_REWARD_TABLE.wb.map(r=>[`อันดับ ${r[0]}`, rewardTxt(r,'wb')]))}</div></div>`;
 }
 function makeWorldBossUnit(d){
   const bc = (d && d.boss) || { faction:'demon', grade:'SSS', lv:30, atk:1.3, def:1.2, spd:1, icon:'👹' };
@@ -7238,7 +7258,7 @@ function renderTower(){
       <div class="note">ใช้ทีมที่ยืนยันไว้ เริ่มเลือดเต็ม (ไม่กระทบเลือดจริง ไม่มีโทษการตาย) · ศัตรูเก่งขึ้นทุกชั้น ทุก 10 ชั้นเป็นชั้นบอส · แพ้ = จบรอบ</div></div>`}
     <div class="panel"><h2>🎁 รางวัลชั้น (ครั้งแรกของเดือน)</h2><div>${ms}</div>
       <div class="note">⚠️ รางวัลอันดับหอคอยรายเดือน ต้องปีนถึงอย่างน้อยชั้น ${cfgSet('tw_min_floor')}${(t.best||0)>=cfgSet('tw_min_floor')?' ✅ คุณผ่านเกณฑ์แล้ว':` (ตอนนี้ ${t.best||0})`}</div>
-      <div style="margin-top:10px;">${gTable(['อันดับเดือนนี้','รางวัล'], KILL_REWARD_TABLE.tw.map(r=>[`อันดับ ${r[0]}`, rewardTxt(r)]))}</div></div>`;
+      <div style="margin-top:10px;">${gTable(['อันดับเดือนนี้','รางวัล'], KILL_REWARD_TABLE.tw.map(r=>[`อันดับ ${r[0]}`, rewardTxt(r,'tw')]))}</div></div>`;
 }
 async function towerStart(){
   if(battleActive) return;
