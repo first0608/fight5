@@ -353,6 +353,10 @@
   .mterr{ margin:8px 0 4px; padding:8px; border:1px solid var(--line); border-radius:10px; background:rgba(0,0,0,.25); font-size:12px; }
   .mterr-act{ display:flex; flex-direction:column; gap:5px; margin-top:6px; }
   .mterr-act button{ width:100%; font-size:12px; padding:8px; }
+  .battlebtns{ flex-wrap:wrap; gap:6px; }
+  .battlebtns > button{ flex:1 1 30%; min-width:0; padding:9px 4px; font-size:12px; }
+  .atb{ height:4px; margin-top:2px; background:rgba(255,255,255,.08); border-radius:2px; overflow:hidden; }
+  .atb > div{ height:100%; background:linear-gradient(90deg,#4fc3f7,#ffd54a); transition:width .05s linear; }
   .ptbadge{ display:inline-block; background:var(--accent); color:#1a1a1a; font-weight:800; font-size:9px; padding:0 4px; border-radius:6px; animation:ptpulse 1.6s ease-in-out infinite; }
   @keyframes ptpulse{ 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
   .mteam{ display:flex; gap:6px; margin:6px 0 2px; }
@@ -574,9 +578,10 @@
           <div class="side" id="sideEnemy"></div>
         </div>
         <div id="battleLog"></div>
-        <div class="row" style="margin-top:10px;">
-          <button class="primary" id="btnStep" onclick="battleStep()">ตีต่อ ▶</button>
-          <button class="ghost" id="btnAuto" onclick="toggleAutoBattle()">อัตโนมัติ</button>
+        <div class="row battlebtns" style="margin-top:10px;">
+          <button class="primary" id="btnStep" onclick="battleBtnStep()">ตีต่อ ▶</button>
+          <button class="ghost" id="btnAuto" onclick="battleBtnAuto()">อัตโนมัติ</button>
+          <button class="ghost" id="btnRtMode" onclick="battleToggleRt()" title="สลับโหมดเรียลไทม์ / ทีละเทิร์น">⏱️ เรียลไทม์</button>
           <button class="diamond" id="btnInstant" onclick="fastBattle()">⚡ อัตโนมัติเร็ว</button>
           <button class="primary" id="btnModeNext" style="display:none;" onclick="modeNextClick()">▶ ต่อ</button>
           <button class="ghost" id="btnLeave" onclick="closeBattle(true)">ออก</button>
@@ -1729,6 +1734,7 @@ function renderGuide(){
     • 📡 <b>เรดาห์</b> (ซื้อจากทหารผ่านศึก · ต้องอยู่ในกระเป๋า): ใช้ 1 อัน เห็นตำแหน่งผู้เล่นนอกเมืองในโซนนั้น ${MAP_RADAR_STEPS} ก้าว แล้วผลหายไป`));
 
   secs.push(gSec('⚔️ การต่อสู้', `
+    • <b>⏱️ โหมดเรียลไทม์</b> (ค่าเริ่มต้น): ทุกตัวมีหลอดความเร็ว (แถบฟ้า–เหลืองใต้เลือด) เติมตาม SPD เต็มแล้วลงมือเอง — ตัวที่ SPD สูงตีถี่กว่า · ปุ่ม ⏸ หยุด/▶ เล่นต่อ · ⏩ ความเร็ว x1/x2/x4 · ⚡ อัตโนมัติเร็ว = x4 · กดปุ่ม ⏱️ เพื่อสลับกลับเป็นโหมดทีละเทิร์นแบบเดิมได้<br>
     ${gTable(['โซน','เลเวลมอน','เกรดศัตรู','เหรียญ','EXP'], Object.entries(STAGES).filter(([k,st])=>!st.isBoss).map(([k,st])=>[MAP_ZONE_NAME[k], stageLvText(k), st.grades.join('–'), `${st.coinRange[0]}–${st.coinRange[1]}`, st.expReward]))}
     • มอนสเตอร์มีเลเวลตามด่าน สเตตัสโตต่อเลเวล HP +${ENEMY_LV_GROWTH.hp*100}% · ATK +${ENEMY_LV_GROWTH.atk*100}% · DEF +${ENEMY_LV_GROWTH.def*100}% · SPD +${ENEMY_LV_GROWTH.spd*100}%<br>
     • ตัวละครเลเวลเกินมอนสูงสุดของด่านเกิน ${EXP_OVERLEVEL_FREE} เลเวล ได้ EXP ลดลง ${EXP_OVERLEVEL_STEP*100}% ต่อเลเวล (เหลืออย่างน้อย 10%)<br>
@@ -3862,6 +3868,7 @@ function unitCardHtml(u){
     <div class="binfo">
       <div class="bname">${FACTIONS[u.char.faction].icon} <span class="note" style="margin:0;">Lv.${u.char.level||1}</span> ${u.char.name} ${(()=>{const g=u.char.grade||u.char.dnaGrade; return g?`<span style="color:${GRADES[g].color}">${g}</span>`:'<span style="color:var(--text-dim)">—</span>';})()}</div>
       <div class="hpbar ${pct<30?'low':''}"><div style="width:${pct}%"></div></div>
+      ${rtOn() ? `<div class="atb"><div style="width:${u.alive?Math.min(100,Math.round(u.rtG||0)):0}%"></div></div>` : ''}
     </div>
   </div>`;
 }
@@ -3870,6 +3877,8 @@ function renderBattle(){
   document.getElementById('sideMe').innerHTML = battleUnits.filter(u=>u.side==='me').map(unitCardHtml).join('');
   document.getElementById('sideEnemy').innerHTML = battleUnits.filter(u=>u.side==='en').map(unitCardHtml).join('');
   renderTeamHp();
+  if(rtOn() && battleActive && !battleOver && !autoTimer && !rtPaused) rtStart();   // ⏱️ เริ่มเดินเวลาเองเมื่อไฟต์เริ่ม
+  rtSync();
 }
 
 function flashAttacker(u){
@@ -4417,23 +4426,32 @@ async function endBattle(result){
 }
 
 // advances exactly one actor's turn
-function battleStep(){
-  if(battleOver) return;
-  if(roundQueue.length===0){
-    if(modeBattle && modeBattle.maxRounds){
-      modeBattle.round++;
-      if(modeBattle.round > modeBattle.maxRounds){ endModeBattle('timeout'); return; }
-      if(modeBattle.type==='wb') logLine('sys', `— รอบที่ ${modeBattle.round}/${modeBattle.maxRounds} —`);
-    }
-    if(warBattle){
-      warBattle.round++;
-      if(warBattle.round > WAR_MAX_ROUNDS){ endWarBattle('timeout'); return; }
-      logLine('sys', `— รอบที่ ${warBattle.round} —`);
-    }
-    roundQueue = battleUnits.filter(u=>u.alive).sort((a,b)=> effectiveSpd(b)-effectiveSpd(a));
-    bypassFront = {me:false, en:false};   // เริ่มรอบใหม่ รีเซ็ตสถานะ "ข้ามแนวหน้า" ของ DNA แสงจับจ้อง
+// เริ่ม "รอบ" ใหม่ (นับรอบบอสโลก/สงคราม + รีเซ็ตสถานะต่อรอบ) — คืน false ถ้าไฟต์จบเพราะหมดรอบ
+function battleRoundStart(){
+  if(modeBattle && modeBattle.maxRounds){
+    modeBattle.round++;
+    if(modeBattle.round > modeBattle.maxRounds){ endModeBattle('timeout'); return false; }
+    if(modeBattle.type==='wb') logLine('sys', `— รอบที่ ${modeBattle.round}/${modeBattle.maxRounds} —`);
   }
-  const actor = roundQueue.shift();
+  if(warBattle){
+    warBattle.round++;
+    if(warBattle.round > WAR_MAX_ROUNDS){ endWarBattle('timeout'); return false; }
+    logLine('sys', `— รอบที่ ${warBattle.round} —`);
+  }
+  bypassFront = {me:false, en:false};   // เริ่มรอบใหม่ รีเซ็ตสถานะ "ข้ามแนวหน้า" ของ DNA แสงจับจ้อง
+  return true;
+}
+function battleStep(forcedActor){
+  if(battleOver) return;
+  let actor;
+  if(forcedActor && forcedActor.alive !== undefined){ actor = forcedActor; }   // โหมดเรียลไทม์: ระบบเลือกตัวที่หลอดเต็ม
+  else {
+    if(roundQueue.length===0){
+      if(!battleRoundStart()) return;
+      roundQueue = battleUnits.filter(u=>u.alive).sort((a,b)=> effectiveSpd(b)-effectiveSpd(a));
+    }
+    actor = roundQueue.shift();
+  }
   if(!actor || !actor.alive) { renderBattle(); return; }
 
   // poison tick
@@ -4597,6 +4615,76 @@ function battleStep(){
 }
 
 let autoOn=false;
+// =====================================================================
+// ⏱️ การต่อสู้แบบเรียลไทม์ (หลอดความเร็ว): ทุกตัวมีหลอดเติมตาม SPD เต็ม 100 = ได้ลงมือ 1 ครั้ง
+//   ใช้กติกา/สกิล/DNA เดิมทั้งหมด (เรียก battleStep กับตัวที่หลอดเต็ม) · 1 "รอบ" = จำนวนครั้งเท่ากับตัวที่ยังมีชีวิต
+// =====================================================================
+let rtSpeed = 1, rtPaused = false, rtActs = 0, rtRoundSize = 0, rtLast = 0, rtBase = 1;
+const RT_TURN_SEC = 1.1;   // ตัวที่ SPD เฉลี่ย ลงมือทุก ~1.1 วินาที (ที่ความเร็ว x1)
+function rtOn(){ return !(profile && profile.rtOff); }
+function rtStart(){
+  if(!rtOn() || !battleActive || battleOver) return;
+  if(autoTimer) clearInterval(autoTimer);
+  const alive = battleUnits.filter(u=>u.alive);
+  const avg = alive.reduce((a,u)=>a+Math.max(1,effectiveSpd(u)),0) / Math.max(1, alive.length);
+  rtBase = 100 / (Math.max(1,avg) * RT_TURN_SEC);
+  battleUnits.forEach(u=>{ if(u.rtG==null) u.rtG = Math.random()*35; });
+  rtActs = 0; rtRoundSize = 0; rtLast = performance.now();
+  autoTimer = setInterval(rtTick, 50);
+  rtSync();
+}
+function rtTick(){
+  if(battleOver || !battleActive){ if(autoTimer){ clearInterval(autoTimer); autoTimer=null; } rtSync(); return; }
+  const now = performance.now();
+  let dt = Math.min(0.25, (now - rtLast)/1000); rtLast = now;
+  if(rtPaused) return;
+  dt *= rtSpeed;
+  battleUnits.forEach(u=>{ if(u.alive){ if(u.rtG==null) u.rtG = 0; u.rtG = Math.min(160, u.rtG + Math.max(1,effectiveSpd(u))*rtBase*dt); } });
+  for(let k=0; k < (rtSpeed>=4 ? 3 : rtSpeed>=2 ? 2 : 1); k++){
+    const ready = battleUnits.filter(u=>u.alive && u.rtG>=100).sort((a,b)=> b.rtG-a.rtG)[0];
+    if(!ready) break;
+    ready.rtG -= 100;
+    if(rtRoundSize<=0 || rtActs>=rtRoundSize){
+      if(!battleRoundStart()) return;
+      rtActs = 0; rtRoundSize = Math.max(1, battleUnits.filter(u=>u.alive).length);
+    }
+    rtActs++;
+    battleStep(ready);
+    if(battleOver || !battleActive) break;
+  }
+  rtPaint();
+}
+function rtPaint(){
+  battleUnits.forEach(u=>{
+    const el = document.querySelector(`.bunit[data-uid="${u.char.id}-${u.side}"] .atb > div`);
+    if(el) el.style.width = (u.alive ? Math.min(100, Math.round(u.rtG||0)) : 0) + '%';
+  });
+}
+function rtSync(){
+  const st = document.getElementById('btnStep'), au = document.getElementById('btnAuto'), md = document.getElementById('btnRtMode');
+  if(md) md.textContent = rtOn() ? '⏱️ เรียลไทม์' : '🔢 ทีละเทิร์น';
+  if(!rtOn()) { if(st) st.textContent = 'ตีต่อ ▶'; return; }
+  if(st) st.textContent = rtPaused ? '▶ เล่นต่อ' : '⏸ หยุด';
+  if(au) au.textContent = `⏩ x${rtSpeed}`;
+}
+function battleBtnStep(){
+  if(!rtOn() || battleOver || !battleActive){ battleStep(); return; }
+  rtPaused = !rtPaused; if(!rtPaused && !autoTimer) rtStart(); rtSync();
+}
+function battleBtnAuto(){
+  if(!rtOn()){ toggleAutoBattle(); return; }
+  rtSpeed = rtSpeed===1 ? 2 : rtSpeed===2 ? 4 : 1;
+  profile.rtSpeed = rtSpeed; saveProfile();
+  rtPaused = false; if(battleActive && !battleOver && !autoTimer) rtStart(); rtSync();
+}
+function battleToggleRt(){
+  profile.rtOff = !profile.rtOff; saveProfile();
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  autoOn = false; rtPaused = false;
+  if(rtOn() && battleActive && !battleOver) rtStart();
+  rtSync();
+  showToast(rtOn() ? '⏱️ โหมดเรียลไทม์: หลอดเต็มแล้วลงมือเอง' : '🔢 โหมดทีละเทิร์น: กด "ตีต่อ" เอง');
+}
 function toggleAutoBattle(){
   autoOn = !autoOn;
   document.getElementById('btnAuto').textContent = autoOn ? 'หยุดอัตโนมัติ' : 'อัตโนมัติ';
@@ -4619,7 +4707,7 @@ function closeBattle(byUser){
   const nb = document.getElementById('btnModeNext'); if(nb) nb.style.display='none';
   const wasPvpMap = pvpBattle && pvpBattle.map;
   warBattle = null; pvpBattle = null; mapBattle = null; terrBattle = null; pvpChain = null;
-  battleActive=false; battleOver=false;
+  battleActive=false; battleOver=false; rtPaused = false; rtSpeed = (profile && profile.rtSpeed) || 1;
   if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
   autoOn=false;
   renderTeamHp();
@@ -5882,6 +5970,7 @@ async function buyVip(){
 // ⚡ สู้อัตโนมัติเร็ว (ทุกคน) — ตีเองทีละเทิร์นเร็วๆ ให้เห็นการต่อสู้ (แทนปุ่มจบทันทีแบบเดิม)
 function fastBattle(){
   if(!battleActive || battleOver) return;
+  if(rtOn()){ rtSpeed = 4; rtPaused = false; if(!autoTimer) rtStart(); rtSync(); return; }   // เรียลไทม์: เร่งเป็น x4
   if(autoTimer) clearInterval(autoTimer);
   autoOn = true; document.getElementById('btnAuto').textContent = 'หยุดอัตโนมัติ';
   autoTimer = setInterval(()=>{ if(!battleOver) battleStep(); else { clearInterval(autoTimer); autoTimer=null; } }, 80);
@@ -6684,7 +6773,7 @@ async function endPvpBattle(result){
       document.getElementById('btnStep').disabled = false;
       document.getElementById('battleLog').innerHTML = keepLog + document.getElementById('battleLog').innerHTML;
       updateLeaveBtn();
-      if(profile.mapAuto) setTimeout(()=>{ if(battleActive && !battleOver && !autoTimer) fastBattle(); }, 300);
+      if(profile.mapAuto) setTimeout(()=>{ if(battleActive && !battleOver && (rtOn() || !autoTimer)) fastBattle(); }, 300);
     }, 1500);
     return;
   }
@@ -7752,6 +7841,7 @@ function mapShareChat(){
 function mapToggleAuto(){ profile.mapAuto = !profile.mapAuto; saveProfile(); renderMapPanel(); showToast(profile.mapAuto ? '⚡ สู้อัตโนมัติ: เปิด' : 'สู้อัตโนมัติ: ปิด'); }
 function mapMaybeAuto(){
   if(!profile.mapAuto || !battleActive) return;
+  if(rtOn()){ rtSpeed = 4; rtPaused = false; if(!autoTimer) rtStart(); rtSync(); return; }
   if(autoTimer) clearInterval(autoTimer);
   autoOn = true; const b = document.getElementById('btnAuto'); if(b) b.textContent = 'หยุดอัตโนมัติ';
   autoTimer = setInterval(()=>{ if(!battleOver) battleStep(); else { clearInterval(autoTimer); autoTimer=null; } }, 80);
@@ -7923,7 +8013,7 @@ function terrNextFight(){
   if(tb.idx===0) document.getElementById('battleLog').innerHTML='';
   logLine('sys', `🚩 ตี${tb.target.t==='camp'?'ค่าย':'ธง'}กิล ${esc(tb.target.gn)} — ผู้ป้องกันคนที่ ${tb.idx+1}/${tb.defs.length}: ${esc(d.n)}${d.npc?'':` (Lv.${d.lv})`}`);
   renderBattle();
-  if(profile.mapAuto) setTimeout(()=>{ if(battleActive && !battleOver && !autoTimer) fastBattle(); }, 300);
+  if(profile.mapAuto) setTimeout(()=>{ if(battleActive && !battleOver && (rtOn() || !autoTimer)) fastBattle(); }, 300);
 }
 async function endTerrBattle(result){
   const tb = terrBattle; if(!tb || tb.ending) return;
