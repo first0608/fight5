@@ -355,6 +355,11 @@
   .mterr-act button{ width:100%; font-size:12px; padding:8px; }
   .battlebtns{ flex-wrap:wrap; gap:6px; }
   .battlebtns > button{ flex:1 1 30%; min-width:0; padding:9px 4px; font-size:12px; }
+  .spb{ height:3px; margin-top:2px; background:rgba(255,255,255,.06); border-radius:2px; overflow:hidden; }
+  .spb > div{ height:100%; background:linear-gradient(90deg,#b388ff,#ff6ec7); }
+  .ultbtn{ margin-top:3px; padding:3px 6px; font-size:10px; line-height:1.2; width:100%; border-radius:6px; background:rgba(179,136,255,.12); color:var(--text-dim); border:1px solid rgba(179,136,255,.35); }
+  .ultbtn.ready{ background:linear-gradient(90deg,#7c4dff,#ff4fa3); color:#fff; font-weight:800; border-color:#fff; animation:ultpulse .9s ease-in-out infinite; }
+  @keyframes ultpulse{ 0%,100%{ box-shadow:0 0 0 rgba(255,79,163,0); } 50%{ box-shadow:0 0 10px rgba(255,79,163,.9); } }
   .atb{ height:4px; margin-top:2px; background:rgba(255,255,255,.08); border-radius:2px; overflow:hidden; }
   .atb > div{ height:100%; background:linear-gradient(90deg,#4fc3f7,#ffd54a); transition:width .05s linear; }
   .ptbadge{ display:inline-block; background:var(--accent); color:#1a1a1a; font-weight:800; font-size:9px; padding:0 4px; border-radius:6px; animation:ptpulse 1.6s ease-in-out infinite; }
@@ -582,6 +587,7 @@
           <button class="primary" id="btnStep" onclick="battleBtnStep()">ตีต่อ ▶</button>
           <button class="ghost" id="btnAuto" onclick="battleBtnAuto()">อัตโนมัติ</button>
           <button class="ghost" id="btnRtMode" onclick="battleToggleRt()" title="สลับโหมดเรียลไทม์ / ทีละเทิร์น">⏱️ เรียลไทม์</button>
+          <button class="ghost" id="btnUltAuto" onclick="ultToggleAuto()" title="ใช้สกิลอัตโนมัติเมื่อพลังเต็ม">✨ สกิล: กดเอง</button>
           <button class="diamond" id="btnInstant" onclick="fastBattle()">⚡ อัตโนมัติเร็ว</button>
           <button class="primary" id="btnModeNext" style="display:none;" onclick="modeNextClick()">▶ ต่อ</button>
           <button class="ghost" id="btnLeave" onclick="closeBattle(true)">ออก</button>
@@ -1734,6 +1740,7 @@ function renderGuide(){
     • 📡 <b>เรดาห์</b> (ซื้อจากทหารผ่านศึก · ต้องอยู่ในกระเป๋า): ใช้ 1 อัน เห็นตำแหน่งผู้เล่นนอกเมืองในโซนนั้น ${MAP_RADAR_STEPS} ก้าว แล้วผลหายไป`));
 
   secs.push(gSec('⚔️ การต่อสู้', `
+    • <b>✨ สกิลกดเอง</b>: แถบม่วงใต้ตัวละคร = พลังสะสม (ลงมือ +25 · โดนตี +8) เต็ม 100 แล้วปุ่มสกิลจะกะพริบ กดใช้ได้ทันที · ${Object.values(ULTS).map(x=>`${x.icon} ${x.name}: ${x.desc}`).join(' · ')} · ศัตรูใช้สกิลเองเมื่อเต็ม (บอสสะสมช้าครึ่งหนึ่ง) · ปุ่ม "✨ สกิล: ออโต้" ให้ใช้เองอัตโนมัติ (ความเร็ว x4 ใช้ให้อัตโนมัติเสมอ)<br>
     • <b>⏱️ โหมดเรียลไทม์</b> (ค่าเริ่มต้น): ทุกตัวมีหลอดความเร็ว (แถบฟ้า–เหลืองใต้เลือด) เติมตาม SPD เต็มแล้วลงมือเอง — ตัวที่ SPD สูงตีถี่กว่า · ปุ่ม ⏸ หยุด/▶ เล่นต่อ · ⏩ ความเร็ว x1/x2/x4 · ⚡ อัตโนมัติเร็ว = x4 · กดปุ่ม ⏱️ เพื่อสลับกลับเป็นโหมดทีละเทิร์นแบบเดิมได้<br>
     ${gTable(['โซน','เลเวลมอน','เกรดศัตรู','เหรียญ','EXP'], Object.entries(STAGES).filter(([k,st])=>!st.isBoss).map(([k,st])=>[MAP_ZONE_NAME[k], stageLvText(k), st.grades.join('–'), `${st.coinRange[0]}–${st.coinRange[1]}`, st.expReward]))}
     • มอนสเตอร์มีเลเวลตามด่าน สเตตัสโตต่อเลเวล HP +${ENEMY_LV_GROWTH.hp*100}% · ATK +${ENEMY_LV_GROWTH.atk*100}% · DEF +${ENEMY_LV_GROWTH.def*100}% · SPD +${ENEMY_LV_GROWTH.spd*100}%<br>
@@ -3869,6 +3876,8 @@ function unitCardHtml(u){
       <div class="bname">${FACTIONS[u.char.faction].icon} <span class="note" style="margin:0;">Lv.${u.char.level||1}</span> ${u.char.name} ${(()=>{const g=u.char.grade||u.char.dnaGrade; return g?`<span style="color:${GRADES[g].color}">${g}</span>`:'<span style="color:var(--text-dim)">—</span>';})()}</div>
       <div class="hpbar ${pct<30?'low':''}"><div style="width:${pct}%"></div></div>
       ${rtOn() ? `<div class="atb"><div style="width:${u.alive?Math.min(100,Math.round(u.rtG||0)):0}%"></div></div>` : ''}
+      ${!u.isMinion && ULTS[u.char.faction] ? `<div class="spb"><div style="width:${u.alive?Math.floor(u.sp||0):0}%"></div></div>` : ''}
+      ${u.side==='me' && !u.isMinion && ULTS[u.char.faction] && u.alive ? `<button class="ultbtn ${(u.sp||0)>=100?'ready':''}" ${(u.sp||0)>=100?'':'disabled'} onclick="castUltUI('${u.char.id}-${u.side}')" title="${esc(ULTS[u.char.faction].desc)}">${ULTS[u.char.faction].icon} ${ULTS[u.char.faction].name} ${(u.sp||0)>=100?'!':Math.floor(u.sp||0)+'%'}</button>` : ''}
     </div>
   </div>`;
 }
@@ -4060,6 +4069,7 @@ function resolveHit(att, def, dmgMultiplier=1, isSplash=false, braveSwordProc=fa
   }
 
   checkDeath(def);
+  if(dmg>0 && !isSplash) ultGain(def, ULT_GAIN_HIT);   // ✨ โดนตี = พลังสะสม +8
   return dmg;
 }
 
@@ -4426,6 +4436,57 @@ async function endBattle(result){
 }
 
 // advances exactly one actor's turn
+// =====================================================================
+// ✨ สกิลกดเอง (อัลติเมต): พลังสะสม 0–100 · ลงมือ +25 · โดนตี +8 · เต็มแล้วกดปุ่มใต้ตัวละครเพื่อใช้ทันที
+//   ฝั่งศัตรู/AI ใช้เองเมื่อเต็ม · บอสสะสมพลังได้ครึ่งเดียว · โหมดเร็ว x4 / สู้อัตโนมัติบนแผนที่ = ใช้ให้อัตโนมัติ
+// =====================================================================
+const ULT_GAIN_ACT = 25, ULT_GAIN_HIT = 8;
+const ULTS = {
+  human:   { icon:'⚔️', name:'ฟันสะบั้น',   desc:'ฟันแนวหน้าศัตรู 250% ATK' },
+  machine: { icon:'🛡️', name:'เกราะพลังงาน', desc:'ทั้งทีม DEF +35% นาน 2 เทิร์น' },
+  zombie:  { icon:'☠️', name:'คลื่นพิษ',     desc:'ตีศัตรูทุกตัว 60% ATK + ติดพิษ 3 เทิร์น' },
+  angel:   { icon:'✨', name:'พรแห่งแสง',    desc:'ฮีลทีม 12% เลือดสูงสุดตัวเอง + ล้างพิษ/ชะลอ/อัมพาต' },
+  demon:   { icon:'🔥', name:'เพลิงนรก',     desc:'ตีศัตรูสุ่ม 2 ตัว ตัวละ 160% ATK' },
+};
+function ultIsBoss(u){ return !!(u.char.isWarBoss || u.char.isMapBoss || u.char.isWbBoss || (modeBattle && modeBattle.type==='wb' && u.side==='en')); }
+function ultGain(u, n){ if(!u || !u.alive || u.isMinion || !ULTS[u.char.faction]) return; u.sp = Math.min(100, (u.sp||0) + (ultIsBoss(u) ? n/2 : n)); }
+function ultAutoOn(){ return !!(profile && (profile.ultAuto || rtSpeed>=4 || (profile.mapAuto && mapBattle))); }
+function ultAutoCheck(){
+  for(const u of battleUnits){
+    if(battleOver) return;
+    if(!u.alive || u.isMinion || (u.sp||0) < 100) continue;
+    if(u.side==='en' || ultAutoOn()) castUlt(u, true);
+  }
+}
+function castUlt(u, auto){
+  if(!u || !u.alive || battleOver || !battleActive || (u.sp||0) < 100 || u.isMinion) return false;
+  const U = ULTS[u.char.faction]; if(!U) return false;
+  u.sp = 0;
+  const foe = u.side==='me' ? 'en' : 'me';
+  flashAttacker(u);
+  logLine(u.side==='me'?'me':'en', `${U.icon} ${u.char.name} ใช้สกิล "${U.name}"!${auto&&u.side==='me'?' (ออโต้)':''}`);
+  const f = u.char.faction;
+  if(f==='human'){ const t = frontOf(foe); if(t) resolveHit(u, t, 2.5, false); }
+  else if(f==='machine'){ aliveOf(u.side).forEach(a=>{ a.defBuff = { turnsLeft:2, pct:35 }; }); logLine('sys', '🛡️ ทีมได้เกราะพลังงาน DEF +35% (2 เทิร์น)'); }
+  else if(f==='zombie'){ aliveOf(foe).forEach(e=>{ resolveHit(u, e, 0.6, true); if(e.alive){ inflictPoison(e, 3, 3); } }); }
+  else if(f==='angel'){
+    const heal = Math.round(u.maxHp*0.12*getHealMult(u.side));
+    aliveOf(u.side).forEach(a=>{ a.curHp = Math.min(a.maxHp, a.curHp + heal); if(a.poison){ a.poison=null; a.poisonedActive=false; } a.slowDebuff=null; a.stunTurns=0; });
+    logLine('sys', `✨ ทีมฟื้น ${heal} HP และล้างดีบัฟ`);
+  }
+  else if(f==='demon'){ const pool = aliveOf(foe).slice().sort(()=>Math.random()-0.5).slice(0,2); pool.forEach(t=> resolveHit(u, t, 1.6, false)); }
+  renderBattle();
+  checkBattleOutcome();
+  return true;
+}
+function castUltUI(key){
+  const u = battleUnits.find(x=> `${x.char.id}-${x.side}`===key && x.side==='me');
+  if(!u) return;
+  if(!battleActive || battleOver){ showToast('ไฟต์จบแล้ว'); return; }
+  if((u.sp||0) < 100){ showToast(`พลังสะสมยังไม่เต็ม (${Math.floor(u.sp||0)}%)`); return; }
+  castUlt(u, false);
+}
+function ultToggleAuto(){ profile.ultAuto = !profile.ultAuto; saveProfile(); rtSync(); showToast(profile.ultAuto ? '✨ ใช้สกิลอัตโนมัติเมื่อพลังเต็ม' : '✨ กดใช้สกิลเอง (โหมดเร็ว x4 ยังใช้ให้อัตโนมัติ)'); }
 // เริ่ม "รอบ" ใหม่ (นับรอบบอสโลก/สงคราม + รีเซ็ตสถานะต่อรอบ) — คืน false ถ้าไฟต์จบเพราะหมดรอบ
 function battleRoundStart(){
   if(modeBattle && modeBattle.maxRounds){
@@ -4443,6 +4504,7 @@ function battleRoundStart(){
 }
 function battleStep(forcedActor){
   if(battleOver) return;
+  ultAutoCheck(); if(battleOver) return;
   let actor;
   if(forcedActor && forcedActor.alive !== undefined){ actor = forcedActor; }   // โหมดเรียลไทม์: ระบบเลือกตัวที่หลอดเต็ม
   else {
@@ -4453,6 +4515,7 @@ function battleStep(forcedActor){
     actor = roundQueue.shift();
   }
   if(!actor || !actor.alive) { renderBattle(); return; }
+  ultGain(actor, ULT_GAIN_ACT);   // ✨ ลงมือ 1 ครั้ง = พลังสะสม +25
 
   // poison tick
   if(actor.poison && actor.poison.turnsLeft>0){
@@ -4656,11 +4719,13 @@ function rtTick(){
 }
 function rtPaint(){
   battleUnits.forEach(u=>{
-    const el = document.querySelector(`.bunit[data-uid="${u.char.id}-${u.side}"] .atb > div`);
+    const card = document.querySelector(`.bunit[data-uid="${u.char.id}-${u.side}"]`); if(!card) return;
+    const el = card.querySelector('.atb > div');
     if(el) el.style.width = (u.alive ? Math.min(100, Math.round(u.rtG||0)) : 0) + '%';
   });
 }
 function rtSync(){
+  const ua = document.getElementById('btnUltAuto'); if(ua) ua.textContent = profile && profile.ultAuto ? '✨ สกิล: ออโต้' : '✨ สกิล: กดเอง';
   const st = document.getElementById('btnStep'), au = document.getElementById('btnAuto'), md = document.getElementById('btnRtMode');
   if(md) md.textContent = rtOn() ? '⏱️ เรียลไทม์' : '🔢 ทีละเทิร์น';
   if(!rtOn()) { if(st) st.textContent = 'ตีต่อ ▶'; return; }
