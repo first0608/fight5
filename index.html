@@ -4304,7 +4304,7 @@ function unitCardHtml(u){
   const pct = Math.max(0, Math.round(u.curHp/u.maxHp*100));
   const isFront = u===frontOf(u.side);
   return `<div class="bunit ${u.alive?'':'dead'} ${isFront&&u.alive?'front':''}" data-uid="${u.char.id}-${u.side}">
-    <img src="${sprite}" class="${u.char.art?'bossimg':''}" style="${spriteStyle(u.char.faction)}">
+    <img src="${sprite}" class="${u.char.art && (window.ART||{})['boss_'+u.char.art+'_idle']?'bossimg':''}" style="${spriteStyle(u.char.faction)}">
     <div class="binfo">
       <div class="bname">${FACTIONS[u.char.faction].icon} <span class="note" style="margin:0;">Lv.${u.char.level||1}</span> ${u.char.name} ${(()=>{const g=u.char.grade||u.char.dnaGrade; return g?`<span style="color:${GRADES[g].color}">${g}</span>`:'<span style="color:var(--text-dim)">—</span>';})()}</div>
       <div class="hpbar ${pct<30?'low':''}"><div style="width:${pct}%"></div></div>
@@ -4398,6 +4398,7 @@ function actFloat(u, text, cls){
 function unitSprite(u, pose){
   const A = window.ART || {};
   if(u.char.art && A['boss_'+u.char.art+'_'+pose]) return A['boss_'+u.char.art+'_'+pose];
+  if(u.char.art && pose==='die' && A['boss_'+u.char.art+'_idle']) return A['boss_'+u.char.art+'_idle'];   // ไม่มีท่าตาย ใช้ท่ายืนแทน (ไม่สลับเป็นรูปเผ่า)
   return SPRITES[u.char.faction+'_'+pose] || SPRITES[u.char.faction+'_idle'];
 }
 function flashAttacker(u){
@@ -6233,7 +6234,7 @@ async function buyWarAttempt(){
 function makeWarBossChar(zone){
   const b = WAR_BOSSES[zone];
   return { id:newId(), name:`👹 ${b.name}`, faction:b.faction, grade:b.grade, level:1, exp:0,
-    stats:{...b.stats}, dna:[], isWarBoss:true, createdAt:Date.now() };
+    stats:{...b.stats}, dna:[], isWarBoss:true, art:'war_'+zone, createdAt:Date.now() };   // รูป: boss_war_<โซน>_idle/atkL/atkR/die ใน art.js
 }
 function warGoBoss(zone){
   const wc = warBossCell(zone, warWindowId()), p = mapPos();
@@ -6940,6 +6941,26 @@ function mktCatOfItem(item){
   if(MKT_POTION_IDS.includes(item.itemId)) return 'potion';
   return 'material';
 }
+// รูปไอเท็มในตลาด (ใช้รูปเดียวกับกระเป๋า/อุปกรณ์/ชิ้นส่วน/DNA จาก art.js)
+function mktItemImg(item){
+  const A = window.ART || {}; let src = null;
+  if(!item) return '';
+  try{
+    if(item.kind==='item'){ const d = ITEM_DEFS[item.itemId] || {}; src = d.bp ? A.it_blueprint_ticket : (A['it_'+item.itemId] || A[item.itemId] || (d.mat && MATERIALS[d.mat]) || MATERIALS[item.itemId]); }
+    else if(item.kind==='part') src = A['pt_'+item.part.slot+'_'+item.part.faction];
+    else if(item.kind==='gear') src = A[gearArtKey(item.gear)];
+    else if(item.kind==='dna') src = A['dna_'+item.pkg.grade];
+  }catch(e){}
+  return src ? `<img class="gear-ic" src="${src}" alt="">` : '';
+}
+function mktKeyImg(key){
+  const a = String(key).split(':');
+  if(a[0]==='i') return mktItemImg({kind:'item', itemId:a[2]});
+  if(a[0]==='p'){ const p = parts.find(x=>x.id===a[1]); return p ? mktItemImg({kind:'part', part:p}) : ''; }
+  if(a[0]==='g'){ const g = equipment.find(x=>x.id===a[1]); return g ? mktItemImg({kind:'gear', gear:g}) : ''; }
+  if(a[0]==='d'){ const d = dnaPackages.find(x=>x.id===a[1]); return d ? mktItemImg({kind:'dna', pkg:d}) : ''; }
+  return '';
+}
 function mktItemLabel(item){
   if(!item) return '?';
   if(item.kind==='item'){ const d = ITEM_DEFS[item.itemId]; return `${d && d.icon ? d.icon+' ' : ''}${d ? d.name : item.itemId} x${item.qty}`; }
@@ -7010,7 +7031,7 @@ function renderP2PMarket(){
   else {
     const rows = mkt.list.filter(x=>(mkt.cat==='all'||x.cat===mkt.cat) && (!mkt.mineOnly||x.mine));
     body = rows.length ? rows.map(x=>`<div class="part-pick-item">
-        <div>${mktItemLabel(x.item)}<div class="note" style="margin:2px 0 0;">ผู้ขาย ${esc(x.sn)}${x.mine?' (คุณ)':''}</div></div>
+        ${mktItemImg(x.item)}<div style="flex:1;min-width:0;">${mktItemLabel(x.item)}<div class="note" style="margin:2px 0 0;">ผู้ขาย ${esc(x.sn)}${x.mine?' (คุณ)':''}</div></div>
         ${x.mine ? `<button class="ghost" onclick="mktCancel('${x.id}')">ยกเลิก · ${x.price}💎</button>`
                  : `<button class="diamond" onclick="mktBuy('${x.id}', ${x.price})" ${(!allowed||profile.diamonds<x.price)?'disabled':''}>ซื้อ · ${x.price.toLocaleString()}💎</button>`}
       </div>`).join('') : `<div class="empty-msg">ยังไม่มีสินค้าในหมวดนี้</div>`;
@@ -7093,7 +7114,7 @@ function mktOpenSell(cat){
     <div class="note">ของที่ใส่อยู่กับตัวละครต้องถอดก่อนถึงจะขายได้ · ได้รับจริง ${100-MKT_TAX_PCT}% ของราคา</div>
     <div style="margin:6px 0;">${chips}</div>
     ${list.length ? list.map(x=>`<div class="part-pick-item" style="flex-wrap:wrap;gap:6px;">
-        <div style="flex:1 1 100%;">${x.label}${x.max>1?` · มี ${x.max}`:''}</div>
+        <div style="flex:1 1 100%;display:flex;gap:8px;align-items:center;">${mktKeyImg(x.key)}<span>${x.label}${x.max>1?` · มี ${x.max}`:''}</span></div>
         ${x.max>1?`<input type="number" id="mq_${x.key.replace(/[^a-zA-Z0-9]/g,'_')}" min="1" max="${x.max}" value="1" style="width:70px;" placeholder="จำนวน">`:''}
         <input type="number" id="mp_${x.key.replace(/[^a-zA-Z0-9]/g,'_')}" min="${MKT_MIN_PRICE}" placeholder="≥${MKT_MIN_PRICE} 💎" style="width:100px;" oninput="mktNetHint('${x.key.replace(/[^a-zA-Z0-9]/g,'_')}')">
         <span class="note" id="mn_${x.key.replace(/[^a-zA-Z0-9]/g,'_')}" style="margin:0;"></span>
@@ -8092,6 +8113,7 @@ function makeWorldBossUnit(d){
   c.name = (bc.icon||'👹') + ' ' + wbBossName(d);
   c.stats.hp = WB_FIGHT_HP; c.stats.atk = Math.round(c.stats.atk*(bc.atk||1)); c.stats.defFlat = Math.round(c.stats.defFlat*(bc.def||1)); c.stats.spd = Math.round(c.stats.spd*(bc.spd||1));
   c.isWarBoss = true;
+  c.art = 'world_' + ((bc && bc.no) || 1);   // รูป: boss_world_<ลำดับบอสในชีท>_idle/atkL/atkR/die ใน art.js
   const u = makeUnit(c,'en'); u.curHp = u.maxHp = WB_FIGHT_HP; return u;
 }
 async function wbFight(){
