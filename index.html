@@ -173,6 +173,32 @@
   #arena{ display:flex; align-items:center; justify-content:space-between; gap:6px; padding:10px 0; }
   #arena .side{ display:flex; flex-direction:column; gap:8px; flex:1 1 0; min-width:0; }
   #arena .vs{ font-weight:800; color:var(--accent); font-size:13px; flex:0 0 auto; }
+  #actStage{ position:relative; height:200px; margin:0 0 8px; border-radius:12px; overflow:hidden; display:none; border:1px solid rgba(255,255,255,.08); }
+  #actStage .act-bg{ position:absolute; inset:0; background-size:cover; background-position:center bottom; filter:brightness(.85); }
+  #actStage .act-floor{ position:absolute; left:0; right:0; bottom:0; height:46px; background:linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.45)); }
+  #actStage .au{ position:absolute; width:84px; margin-left:-42px; display:flex; flex-direction:column; align-items:center; will-change:transform; }
+  #actStage .au img{ height:84px; max-width:120px; object-fit:contain; object-position:bottom; filter:drop-shadow(0 3px 2px rgba(0,0,0,.6)); }
+  #actStage .au.en img{ transform:scaleX(-1); }
+  #actStage .au.boss{ width:110px; margin-left:-55px; }
+  #actStage .au.boss img{ height:112px; max-width:150px; }
+  #actStage .au.front .au-n{ color:#ffd54a; }
+  #actStage .au.dead{ opacity:.75; }
+  #actStage .au.dead .au-hp, #actStage .au.dead .au-n{ visibility:hidden; }
+  #actStage .au-hp{ width:52px; height:5px; background:rgba(0,0,0,.6); border-radius:3px; overflow:hidden; margin-bottom:1px; }
+  #actStage .au-hp > div{ height:100%; background:#5bd16b; transition:width .25s; }
+  #actStage .au-hp > div.low{ background:#ff5a4a; }
+  #actStage .au-n{ font-size:9px; font-weight:700; color:#fff; text-shadow:0 1px 2px #000; white-space:nowrap; max-width:90px; overflow:hidden; text-overflow:ellipsis; }
+  #actStage .au.hit img{ animation:auhit .32s; }
+  #actStage .au.en.hit img{ animation:auhitR .32s; }
+  @keyframes auhit{ 0%{ filter:brightness(2.2) sepia(1) hue-rotate(-50deg) saturate(5); transform:translateX(-6px); } 50%{ transform:translateX(5px); } 100%{ transform:none; } }
+  @keyframes auhitR{ 0%{ filter:brightness(2.2) sepia(1) hue-rotate(-50deg) saturate(5); transform:scaleX(-1) translateX(-6px); } 50%{ transform:scaleX(-1) translateX(5px); } 100%{ transform:scaleX(-1); } }
+  #actStage .dmgf{ position:absolute; top:20px; font-weight:900; font-size:15px; color:#fff; text-shadow:0 0 3px #000, 0 2px 0 #000; pointer-events:none; animation:dmgup .9s ease-out forwards; z-index:30; }
+  #actStage .dmgf.crit{ font-size:21px; color:#ffd54a; }
+  #actStage .dmgf.heal{ color:#6dff8a; }
+  #actStage .dmgf.miss{ color:#bbb; font-size:13px; }
+  #actStage .dmgf.elem{ color:#7fd8ff; }
+  @keyframes dmgup{ 0%{ transform:translateY(8px) scale(.6); opacity:0; } 15%{ transform:translateY(0) scale(1.15); opacity:1; } 100%{ transform:translateY(-38px) scale(1); opacity:0; } }
+  #actStage .act-tg{ position:absolute; right:6px; top:6px; z-index:40; padding:2px 6px; font-size:12px; background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.2); border-radius:8px; }
   .bunit{
     position:relative; background:var(--bg-2); border:1px solid var(--line); border-radius:8px;
     padding:6px; display:flex; align-items:center; gap:8px; transition:opacity .2s ease;
@@ -605,6 +631,7 @@
       <div class="panel" id="battleStage" style="display:none;">
         <div id="sceneImg"></div>
         <h2>สนามรบ</h2>
+        <div id="actStage"></div>
         <div id="arena">
           <div class="side" id="sideMe"></div>
           <div class="vs">VS</div>
@@ -618,6 +645,7 @@
           <button class="ghost" id="btnUltAuto" onclick="ultToggleAuto()" title="ใช้สกิลอัตโนมัติเมื่อพลังเต็ม">✨ สกิล: กดเอง</button>
           <button class="diamond" id="btnInstant" onclick="fastBattle()">⚡ อัตโนมัติเร็ว</button>
           <button class="primary" id="btnModeNext" style="display:none;" onclick="modeNextClick()">▶ ต่อ</button>
+          <button class="ghost" id="btnActView" onclick="actToggle()">🎬 ฉากแอคชัน: เปิด</button>
           <button class="ghost" id="btnLeave" onclick="closeBattle(true)">ออก</button>
         </div>
       </div>
@@ -4271,8 +4299,80 @@ function renderBattle(){
   document.getElementById('sideMe').innerHTML = battleUnits.filter(u=>u.side==='me').map(unitCardHtml).join('');
   document.getElementById('sideEnemy').innerHTML = battleUnits.filter(u=>u.side==='en').map(unitCardHtml).join('');
   renderTeamHp();
+  renderAct();
   if(rtOn() && battleActive && !battleOver && !autoTimer && !rtPaused) rtStart();   // ⏱️ เริ่มเดินเวลาเองเมื่อไฟต์เริ่ม
   rtSync();
+}
+
+// =====================================================================
+// 🎬 ฉากแอคชันตอนสู้: ตัวละครยืนเผชิญหน้ากันบนฉาก · ตีแล้วพุ่งเข้าหา · ตัวเลขดาเมจเด้ง · โดนตีสั่น · ตายล้มลง
+// =====================================================================
+function actOn(){ return !!profile && profile.actView !== false; }
+function actToggle(){ profile.actView = !actOn(); saveProfile(); renderAct(); }
+function actSpeed(){ return (typeof rtSpeed!=='undefined' && rtSpeed>=4) || (typeof autoTimer!=='undefined' && autoTimer && !rtOn()) ? 0.45 : (rtSpeed>=2 ? 0.7 : 1); }
+function actPos(u){
+  const list = battleUnits.filter(x=>x.side===u.side);
+  const i = list.indexOf(u), n = list.length;
+  const base = u.side==='me' ? 34 : 66, step = Math.min(13, 34/Math.max(1,n-1 || 1));
+  return { x: u.side==='me' ? base - i*step : base + i*step, y: (i%2) ? 26 : 6 };
+}
+function actEl(u){ return document.querySelector(`#actStage .au[data-uid="${u.char.id}-${u.side}"]`); }
+function renderAct(){
+  const st = document.getElementById('actStage'); if(!st) return;
+  if(!actOn() || !battleUnits.length){ st.style.display = 'none'; st.dataset.key = ''; renderActToggle(); return; }
+  st.style.display = 'block';
+  const key = battleUnits.map(u=>u.char.id+'-'+u.side).join('|');
+  if(st.dataset.key !== key){
+    st.dataset.key = key;
+    const scn = (typeof currentDiff!=='undefined' && STAGES[currentDiff] && SCENES[STAGES[currentDiff].scene]) || (mapBattle && STAGES[mapBattle.zone] && SCENES[STAGES[mapBattle.zone].scene]) || SCENES[STAGES[(typeof mapPos==='function' ? mapPos().z : '')||'hospital'] ? STAGES[mapPos().z].scene : 'hospital'];
+    const bg = scn ? `url(${scn})` : '';
+    st.innerHTML = `<div class="act-bg" style="background-image:${bg||'none'}"></div><div class="act-floor"></div>
+      ${battleUnits.map(u=>{ const p = actPos(u), boss = !!(u.char.art || u.char.isWarBoss || u.char.isWbBoss);
+        return `<div class="au ${u.side} ${boss?'boss':''}" data-uid="${u.char.id}-${u.side}" style="left:${p.x}%;bottom:${p.y}px;z-index:${10+ (p.y?0:5)}">
+          <div class="au-hp"><div></div></div><div class="au-n">${esc(String(u.char.name||'').replace(/^👑 /,'').split(' ').pop())}</div>
+          <img src="${unitSprite(u,'idle')}" style="${spriteStyle(u.char.faction)}"></div>`; }).join('')}
+      <button class="act-tg" onclick="actToggle()" title="ปิดฉากแอคชัน">🎬</button>`;
+  }
+  battleUnits.forEach(u=>{
+    const el = actEl(u); if(!el) return;
+    const pct = Math.max(0, Math.round(u.curHp/u.maxHp*100));
+    const bar = el.querySelector('.au-hp > div'); if(bar){ bar.style.width = pct+'%'; bar.className = pct<30 ? 'low' : ''; }
+    el.classList.toggle('dead', !u.alive);
+    el.classList.toggle('front', u.alive && u===frontOf(u.side));
+    if(!el.dataset.busy){ const img = el.querySelector('img'); const want = unitSprite(u, u.alive ? 'idle' : 'die'); if(img && img.getAttribute('src')!==want) img.src = want; }
+  });
+  renderActToggle();
+}
+function renderActToggle(){
+  const b = document.getElementById('btnActView'); if(b) b.textContent = actOn() ? '🎬 ฉากแอคชัน: เปิด' : '🎬 ฉากแอคชัน: ปิด';
+}
+// ผู้โจมตีพุ่งเข้าหาเป้าหมาย (ใช้ท่าตี) แล้วกลับที่เดิม
+function actLunge(att, def){
+  if(!actOn()) return;
+  const a = actEl(att), d = actEl(def); if(!a || !d || a.dataset.busy) return;
+  const k = actSpeed(), pa = actPos(att), pd = actPos(def);
+  const st = document.getElementById('actStage'), w = st ? st.clientWidth : 360;
+  const dx = (pd.x - pa.x) / 100 * w * 0.62;
+  const img = a.querySelector('img');
+  a.dataset.busy = '1';
+  if(img) img.src = unitSprite(att, 'atkL');
+  a.style.transition = `transform ${Math.round(160*k)}ms ease-in`;
+  a.style.transform = `translateX(${dx}px)`;
+  setTimeout(()=>{ if(img) img.src = unitSprite(att, 'atkR'); }, Math.round(120*k));
+  setTimeout(()=>{ a.style.transition = `transform ${Math.round(220*k)}ms ease-out`; a.style.transform = ''; }, Math.round(260*k));
+  setTimeout(()=>{ delete a.dataset.busy; if(img) img.src = unitSprite(att, att.alive ? 'idle' : 'die'); }, Math.round(480*k));
+}
+// ตัวเลขลอย + โดนตีสั่น
+function actFloat(u, text, cls){
+  if(!actOn()) return;
+  const el = actEl(u); if(!el) return;
+  const f = document.createElement('div');
+  f.className = 'dmgf ' + (cls||'');
+  f.textContent = text;
+  f.style.left = (Math.random()*30 - 15) + 'px';
+  el.appendChild(f);
+  setTimeout(()=>f.remove(), Math.round(900*actSpeed()) + 100);
+  if(cls!=='heal' && cls!=='miss'){ el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
 }
 
 function unitSprite(u, pose){
@@ -4399,7 +4499,9 @@ function resolveHit(att, def, dmgMultiplier=1, isSplash=false, braveSwordProc=fa
   const shieldDefPctBonus = shieldRaised ? defShield.shieldDefPct : 0;
   if(shieldRaised) logLine(def.side==='me'?'me':'en', `🛡️ ${def.char.name} ยกโล่!`);
 
+  if(!isSplash) actLunge(att, def);
   if(dodged){
+    actFloat(def, 'MISS', 'miss');
     logLine(def.side==='me'?'me':'en', `${def.char.name} หลบการโจมตี!`);
     if(evaStat>70){
       let defPct = def.char.stats.defPct + defTraits.machine.pct + (def.defBuff && def.defBuff.turnsLeft>0 ? def.defBuff.pct : 0) + shieldDefPctBonus;
@@ -4467,6 +4569,7 @@ function resolveHit(att, def, dmgMultiplier=1, isSplash=false, braveSwordProc=fa
   if(!isSplash) elemOnHit(att, def, dmg, attEl, shieldRaised ? defShield : null);
 
   logLine(att.side==='me'?'me':'en', `${att.char.name} ${isCrit?'💥คริติคอล':''} ตี ${def.char.name} ไป ${dmg} ดาเมจ`);
+  actFloat(def, (isCrit?'💥':'') + dmg, isCrit ? 'crit' : (attEl ? 'elem' : ''));
 
   // โบนัสชุดครบมนุษย์ "ดาบผู้กล้า": roll ครั้งเดียวต่อแอคชัน (ส่งมาจาก battleStep) ใช้ผลเดียวกันทุกเป้า
   if(braveSwordProc && def.alive && def.curHp>20 && !def.char.isWarBoss){   // บอส (สงครามกิล/บอสโลก) ไม่โดนดาบผู้กล้า
@@ -4544,6 +4647,7 @@ function elemDamage(src, tgt, base, icon, label){
   d = dragonGuardCap(tgt, d);
   if(DEV.on && tgt.side==='me' && DEV.god) d = 0;
   tgt.curHp = Math.max(0, tgt.curHp - d);
+  actFloat(tgt, icon + d, 'elem');
   logLine(src.side==='me'?'me':'en', `${icon} ${label} ใส่ ${tgt.char.name} ${d} ดาเมจ (ธาตุ ทะลุเกราะ)${nE>0?` ×${1+0.5*nE}`:''}`);
   checkDeath(tgt);
   return d;
