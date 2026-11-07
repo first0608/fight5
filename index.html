@@ -281,6 +281,7 @@
   #detailOverlay.show, #partPickOverlay.show, #dailyLoginOverlay.show, #devOverlay.show, #giftOverlay.show, #guideOverlay.show, #playersOverlay.show, #reportOverlay.show{ display:block; }
   #playersOverlay{ z-index:27; }
   #reportOverlay{ z-index:27; }
+  .shop-art{ width:48px; height:48px; object-fit:contain; display:block; margin:0 auto; filter:drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
   #reportOverlay .seg{ flex-wrap:wrap; }
   .act-stats{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin:6px 0; text-align:center; }
   .act-stats > div{ background:var(--bg-2); border:1px solid var(--line); border-radius:10px; padding:6px 2px; }
@@ -3135,6 +3136,7 @@ function checkSupplyWindow(){
 }
 function renderShop(){
   checkSupplyWindow();
+  shopArtify();
   const btn = document.getElementById('suppliesShopBtn');
   const note = document.getElementById('suppliesShopNote');
   const pipeBtn = document.getElementById('pipeMapBtn');
@@ -5983,7 +5985,8 @@ function guildTreasuryBrowserHtml(t, myPts, shopHtml){
   return html + top + `<div class="note" style="margin:4px 0;">${list.length} ชิ้น · ${rows.length} รายการ</div>` + rows.map(({o, oids, minTs})=>{
     const c = guildObjPts(o);
     const left = fmtLeft(minTs + GUILD_OBJ_TTL_MS - Date.now());
-    return `<div class="part-pick-item"><div>${guildObjIcon(o)} ${o.grade?`<b style="color:${(GRADES[o.grade]||{}).color||'inherit'}">${esc(o.grade)}</b> `:''}${esc(guildObjName(o))}
+    const im = guildObjImgHtml(o);
+    return `<div class="part-pick-item">${im}<div style="flex:1;min-width:0;">${im?'':guildObjIcon(o)+' '}${o.grade?`<b style="color:${(GRADES[o.grade]||{}).color||'inherit'}">${esc(o.grade)}</b> `:''}${esc(guildObjName(o))}
         ${oids.length>1?`<b style="color:var(--accent)"> x${oids.length}</b>`:''}<div class="note" style="margin:0;">${c} แต้ม / ชิ้น · ⏳ ${left}</div></div>
       <button class="primary" ${myPts>=c?'':'disabled'} onclick="redeemGuildObj('${esc(oids[0])}')">แลก</button></div>`;
   }).join('');
@@ -6059,6 +6062,28 @@ function guildObjPts(o){
   if(o.kind==='gear' && o.grade && GUILD_GEAR_PTS_ARMOR[o.grade])
     return (GUILD_WEAPON_SLOTS.includes(o.slot) ? GUILD_GEAR_PTS_WEAPON : GUILD_GEAR_PTS_ARMOR)[o.grade];
   return o.grade && GUILD_OBJ_PTS[o.grade] ? GUILD_OBJ_PTS[o.grade] : GUILD_OBJ_PTS_NOGRADE;
+}
+// รูปไอเท็มจาก art.js (ใช้ร่วมกันหลายหน้า)
+function itemArtSrc(id){ const A = window.ART || {}; const d = ITEM_DEFS[id] || {}; try{ return d.bp ? A.it_blueprint_ticket : (A['it_'+id] || A[id] || (d.mat && MATERIALS[d.mat]) || MATERIALS[id] || null); }catch(e){ return null; } }
+function guildObjImgHtml(o){
+  const A = window.ART || {}; let src = null;
+  try{
+    if(o.kind==='part') src = A['pt_'+o.slot+'_'+o.faction];
+    else if(o.kind==='dna') src = A['dna_'+o.grade];
+    else if(o.kind==='gear') src = A[gearArtKey(o)];
+    else if(o.itemId) src = itemArtSrc(o.itemId);
+  }catch(e){}
+  return src ? `<img class="gear-ic" src="${src}" alt="">` : '';
+}
+// ร้านขายของ: เปลี่ยนอีโมจิใหญ่บนการ์ดเป็นรูปจริง
+function shopArtify(){
+  document.querySelectorAll('#shopRow > div').forEach(card=>{
+    const b = card.querySelector('button'); if(!b) return;
+    const oc = b.getAttribute('onclick') || '', m = oc.match(/buyShopItem\('([a-z_0-9]+)'\)/);
+    const id = m ? m[1] : (/buyGoldBarShop/.test(oc) ? 'gold_bar' : null); if(!id) return;
+    const src = itemArtSrc(id), top = card.firstElementChild;
+    if(src && top && !top.querySelector('.shop-art')) top.innerHTML = `<img class="shop-art" src="${src}" alt="">`;
+  });
 }
 function guildObjIcon(o){ return o.kind==='part' ? '🦴' : o.kind==='dna' ? '🧬' : o.kind==='gear' ? '⚔️' : ((ITEM_DEFS[o.itemId]||{}).icon || '📦'); }
 function guildObjName(o){
@@ -9370,13 +9395,14 @@ const ICON_RULES = [
   ['🎒', /🎒(?=\s*(?:เสบียง|x?\d))/u, 'it_oil', 'เสบียง'],
   ['📖', /📖(?=\s*ยาคูณ)/u, 'it_exp_potion', 'ยาคูณ EXP'],
   ['✨', /✨(?=\s*น้ำยาคูณดรอป)/u, 'it_dropmult_potion', 'น้ำยาคูณดรอป'],
-  ['📦', /📦(?=\s*กล่องเก็บเงิน)/u, 'it_money_box', 'กล่องเก็บเงิน'],
+  ['📦', /📦(?=[^\n📦]{0,16}กล่องเก็บเงิน)/u, 'it_money_box', 'กล่องเก็บเงิน'],
   ['🥇', /🥇(?=\s*(?:ทองแท่ง|ขายทอง))/u, 'it_gold_bar', 'ทองแท่ง'],
+  ['💰', /💰(?=\s*ขายทองแท่ง)/u, 'it_gold_bar', 'ทองแท่ง'],
   ['📡', /📡(?=\s*เรดาห์โซนโรงเรียน)/u, 'it_radar_school', 'เรดาห์'],
   ['📡', /📡(?=\s*เรดาห์โซนค่ายทหาร)/u, 'it_radar_campground', 'เรดาห์'],
   ['📡', /📡(?=\s*เรดาห์โซนซากเมือง)/u, 'it_radar_ruins', 'เรดาห์'],
-  ['🧱', /🧱(?=\s*(?:ปูน|x?\d|$))/u, 'it_cement', 'ปูน'],
-  ['🔩', /🔩(?=\s*(?:เหล็กเส้น|x?\d|$))/u, 'it_rebar', 'เหล็กเส้น'],
+  ['🧱', /🧱(?=\s*(?:ส่ง)?(?:ปูน|x?\d|$))/u, 'it_cement', 'ปูน'],
+  ['🔩', /🔩(?=\s*(?:ส่ง)?(?:เหล็กเส้น|x?\d|$))/u, 'it_rebar', 'เหล็กเส้น'],
   ['📜', /📜(?=\s*ใบสุ่มแปลน)/u, 'it_blueprint_ticket', 'ใบสุ่มแปลน'],
   ['🧬', /🧬(?=\s*กล่องสุ่ม\s*DNA)/u, 'it_dna_box', 'กล่องสุ่ม DNA'],
   ['🐉', /🐉(?=\s*ชิ้นส่วนมังกร)/u, 'it_dragon_shard', 'ชิ้นส่วนมังกร'],
