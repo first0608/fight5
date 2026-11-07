@@ -1929,7 +1929,7 @@ function renderGuide(){
       โจมตี/หลบ/ป้องกัน ใช้เมื่อสู้ในช่องที่เป็นเขตธง/ค่ายของกิลเรา (รวมบอสโซนที่เกิดในเขตกิล) · ดรอป/EXP ใช้ทุกด่าน<br>
       <b>แต้มกิล</b> ได้จากการบริจาคและลงสงคราม ใช้แลกของในคลังกิล
       ${gTable(['บริจาค','ได้แต้ม'],[
-        [`🪙 เหรียญ ${GUILD_DONATE_COIN_UNIT}`, GUILD_DONATE_COIN_PTS],[`💎 เพชร 1`, GUILD_PTS_PER_DIAMOND],
+        [`🪙 เหรียญ ${gdPtsRate('coin').toLocaleString()}`, 1],[`💎 เพชร ${gdPtsRate('dia')}`, 1],
         ['🦴 ชิ้นส่วน', GRADE_ORDER.map(g=>`${g} ${GUILD_PART_DONATE_PTS[g]}`).join(' · ')],
         ['🧬 แพ็ค DNA', GRADE_ORDER.map(g=>`${g} ${GUILD_DNA_DONATE_PTS[g]}`).join(' · ')],
         ['⚔️ ลงสงคราม', `${WAR_PTS_BASE} แต้ม/ครั้ง + 1 แต้มทุก ${WAR_DMG_PER_PT.toLocaleString()} ดาเมจ`]])}
@@ -5593,7 +5593,9 @@ const TAX_GEAR_CHANCE = 5;               // ได้อุปกรณ์ → 5
 // แต้มกิล (ใช้แลกของในคลังกิล)
 const GUILD_DONATE_COIN_UNIT = 500;      // บริจาคเหรียญทีละ 500
 const GUILD_DONATE_COIN_PTS = 3;         // เหรียญ 500 = 3 แต้ม
-const GUILD_PTS_PER_DIAMOND = 1;         // เพชร 1 = 1 แต้ม
+const GUILD_PTS_PER_DIAMOND = 1;         // (ค่าเดิม — ใช้ gdPtsRate() แทน)
+// อัตราบริจาคเพชร/เหรียญ → แต้มกิล (ปรับในชีท gd_pts_dia_per / gd_pts_coin_per)
+function gdPtsRate(kind){ const k = kind==='dia' ? 'gd_pts_dia_per' : 'gd_pts_coin_per'; const v = typeof GCFG!=='undefined' && GCFG.set ? Number(GCFG.set[k]) : NaN; return v > 0 ? v : (kind==='dia' ? 3 : 500); }
 const GUILD_PART_DONATE_PTS = { D:1, C:1, B:1, A:2, S:5, SS:10, SSS:15 };   // บริจาคชิ้นส่วนอวัยวะตามเกรด
 const GUILD_DNA_DONATE_PTS = { D:5, C:5, B:5, A:10, S:15, SS:25, SSS:30 };   // บริจาคแพ็ค DNA ตามเกรด
 const WAR_PTS_BASE = 5;                  // ลงสงคราม 1 ครั้ง = 5 แต้ม
@@ -6024,11 +6026,11 @@ function guildTreasuryBrowserHtml(t, myPts, shopHtml){
     const gr = (groups[key] = groups[key] || { o, oids:[], minTs:Infinity });
     gr.oids.push(o.oid); gr.minTs = Math.min(gr.minTs, o._ts||Date.now());
   });
-  const rows = Object.values(groups).sort((a,b)=> guildObjPts(b.o)-guildObjPts(a.o) || guildObjName(a.o).localeCompare(guildObjName(b.o)));
+  const rows = Object.values(groups).sort((a,b)=> guildObjCost(b.o)-guildObjCost(a.o) || guildObjName(a.o).localeCompare(guildObjName(b.o)));
   const top = cat==='all' ? shopHtml : '';
   if(!rows.length) return html + top + `<div class="note">${objs.length ? 'ไม่มีของในหมวดนี้' : 'ยังไม่มีของในคลัง (ได้จากการบริจาค ภาษีอุปกรณ์ และของที่ผู้เล่นทำหล่นในโซนที่กิลครอง)'}</div>`;
   return html + top + `<div class="note" style="margin:4px 0;">${list.length} ชิ้น · ${rows.length} รายการ</div>` + rows.map(({o, oids, minTs})=>{
-    const c = guildObjPts(o);
+    const c = guildObjCost(o);
     const left = fmtLeft(minTs + GUILD_OBJ_TTL_MS - Date.now());
     const im = guildObjImgHtml(o);
     return `<div class="part-pick-item">${im}<div style="flex:1;min-width:0;">${im?'':guildObjIcon(o)+' '}${o.grade?`<b style="color:${(GRADES[o.grade]||{}).color||'inherit'}">${esc(o.grade)}</b> `:''}${esc(guildObjName(o))}
@@ -6154,6 +6156,14 @@ function gearStatText(g){
   return b.join(' ');
 }
 // ของในคลังกิล: {oid, kind:'part'|'dna'|'gear'|'item', ...}
+// 💰 แต้มที่ใช้แลกของในคลังกิล = ราคาฐาน × ตัวคูณในชีท (gshop_part_mult / gshop_dna_mult / gshop_gear_mult / gshop_item_mult)
+//   ราคาฐาน (guildObjPts) ยังใช้คิด EXP ตอนของหมดอายุเหมือนเดิม
+function guildObjMult(o){
+  const k = o.kind==='dna' ? 'gshop_dna_mult' : o.kind==='gear' ? 'gshop_gear_mult' : o.kind==='part' ? 'gshop_part_mult' : 'gshop_item_mult';
+  const v = typeof GCFG!=='undefined' && GCFG.set ? Number(GCFG.set[k]) : NaN;
+  return v > 0 ? v : (o.kind==='item' ? 1 : 3);
+}
+function guildObjCost(o){ return Math.ceil(guildObjPts(o) * guildObjMult(o)); }
 function guildObjPts(o){
   if(o.kind==='dna' && GUILD_DNA_OBJ_PTS[o.grade]) return GUILD_DNA_OBJ_PTS[o.grade];
   if(o.kind==='gear' && o.grade && GUILD_GEAR_PTS_ARMOR[o.grade])
@@ -6201,12 +6211,15 @@ async function donateToGuild(kind){
   let pts, entry;
   if(kind==='dia'){
     if(profile.diamonds < amount){ showToast('เพชรไม่พอ'); return; }
-    pts = amount * GUILD_PTS_PER_DIAMOND;
+    const per = gdPtsRate('dia');
+    if(amount % per !== 0){ showToast(`บริจาคเพชรทีละ ${per} (${per} เพชร = 1 แต้ม)`); return; }
+    pts = amount / per;
     entry = { t:'donate', pid:profile.playerId, name:profile.playerName, pts, dia:amount };
   } else {
-    if(amount % GUILD_DONATE_COIN_UNIT !== 0){ showToast(`บริจาคเหรียญทีละ ${GUILD_DONATE_COIN_UNIT} (500, 1000, 1500 ...)`); return; }
+    const per = gdPtsRate('coin');
+    if(amount % per !== 0){ showToast(`บริจาคเหรียญทีละ ${per.toLocaleString()} (${per.toLocaleString()} เหรียญ = 1 แต้ม)`); return; }
     if(profile.coins < amount){ showToast('เหรียญไม่พอ'); return; }
-    pts = amount / GUILD_DONATE_COIN_UNIT * GUILD_DONATE_COIN_PTS;
+    pts = amount / per;
     entry = { t:'donate', pid:profile.playerId, name:profile.playerName, pts, coin:amount };
   }
   // หักของก่อนแล้วค่อยเขียนบัญชี — ถ้าเขียนไม่สำเร็จ คืนของให้
@@ -6313,7 +6326,7 @@ async function redeemGuildObj(oid){
   const { treasury } = await loadLedger(profile.guildId);
   const o = treasury.objs.find(x=>x.oid===oid);
   if(!o){ showToast('ของชิ้นนี้ถูกแลกไปแล้ว'); await refreshGuildData(true); return; }
-  const cost = guildObjPts(o);
+  const cost = guildObjCost(o);
   const pts = treasury.pts[profile.playerId] || 0;
   if(pts < cost){ showToast(`แต้มกิลไม่พอ (มี ${pts}/${cost})`); return; }
   if(o.kind==='part' && partsInBag() >= PARTS_CAP){ showToast(`คลังชิ้นส่วนเต็ม (${PARTS_CAP})`); return; }
@@ -6616,13 +6629,13 @@ function renderMyGuildPanel(){
     <div class="panel">
       <h2>🎁 บริจาคเข้ากิล</h2>
       <div class="note" style="margin:0 0 4px;color:var(--accent);">📖 บริจาคแล้วได้ EXP กิลด้วย: ${cfgSet('gd_exp_dia_per')||10}💎 / ${(cfgSet('gd_exp_coin_per')||5000).toLocaleString()}🪙 / ปูน+เหล็กเส้น ${cfgSet('gd_exp_mat_per')||20} ชิ้น = EXP กิล 1 · สูงสุด ${cfgSet('gd_exp_daily_cap')||30} EXP ต่อคนต่อวัน · 🚩 ธงให้ EXP กิลทุกวัน: โซน1 ${cfgSet('terr_exp_hospital')} · โซน2 ${cfgSet('terr_exp_school')} · โซน3 ${cfgSet('terr_exp_campground')} · โซน4 ${cfgSet('terr_exp_ruins')} · โซน5 ${cfgSet('terr_exp_deadland')} ต่อธง/วัน</div>
-      <div class="note" style="margin-top:0;">1💎 = ${GUILD_PTS_PER_DIAMOND} แต้ม · ${GUILD_DONATE_COIN_UNIT}🪙 = ${GUILD_DONATE_COIN_PTS} แต้ม · ชิ้นส่วน D/C/B ${GUILD_PART_DONATE_PTS.D} · A ${GUILD_PART_DONATE_PTS.A} · S ${GUILD_PART_DONATE_PTS.S} · SS ${GUILD_PART_DONATE_PTS.SS} · SSS ${GUILD_PART_DONATE_PTS.SSS} แต้ม</div>
+      <div class="note" style="margin-top:0;">${gdPtsRate('dia')}💎 = 1 แต้ม · ${gdPtsRate('coin').toLocaleString()}🪙 = 1 แต้ม · ชิ้นส่วน D/C/B ${GUILD_PART_DONATE_PTS.D} · A ${GUILD_PART_DONATE_PTS.A} · S ${GUILD_PART_DONATE_PTS.S} · SS ${GUILD_PART_DONATE_PTS.SS} · SSS ${GUILD_PART_DONATE_PTS.SSS} แต้ม</div>
       <div class="row" style="margin-top:6px;">
-        <input type="text" inputmode="numeric" id="guildDonateDia" placeholder="จำนวนเพชร">
+        <input type="text" inputmode="numeric" id="guildDonateDia" placeholder="จำนวนเพชร (ทีละ ${gdPtsRate('dia')})">
         <button class="diamond" style="flex:0 0 auto;" onclick="donateToGuild('dia')">บริจาค💎</button>
       </div>
       <div class="row" style="margin-top:6px;">
-        <input type="text" inputmode="numeric" id="guildDonateCoin" placeholder="จำนวนเหรียญ (ทีละ 500)">
+        <input type="text" inputmode="numeric" id="guildDonateCoin" placeholder="จำนวนเหรียญ (ทีละ ${gdPtsRate('coin').toLocaleString()})">
         <button class="primary" style="flex:0 0 auto;" onclick="donateToGuild('coin')">บริจาค🪙</button>
       </div>
       <div style="font-size:12px;font-weight:700;margin:10px 0 4px 0;">🧱 บริจาคปูน / 🔩 เหล็กเส้น <span class="note">(${(TERR.cfg&&TERR.cfg.matPerPt)||10} ชิ้น = 1 แต้ม · เข้าคลังวัสดุกิล ใช้จ่ายค่าบำรุงค่าย/ธง)</span></div>
