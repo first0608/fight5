@@ -281,6 +281,8 @@
   #detailOverlay.show, #partPickOverlay.show, #dailyLoginOverlay.show, #devOverlay.show, #giftOverlay.show, #guideOverlay.show, #playersOverlay.show, #reportOverlay.show{ display:block; }
   #playersOverlay{ z-index:27; }
   #reportOverlay{ z-index:27; }
+  .mradar{ margin:4px 0 2px; padding:4px 8px; border-radius:8px; background:rgba(224,168,58,.12); border:1px solid var(--accent); font-size:12px; line-height:1.6; }
+  .dna-pre{ font-size:11px; line-height:1.5; margin-top:3px; padding:4px 6px; background:rgba(255,255,255,.04); border-radius:6px; }
   .shop-art{ width:48px; height:48px; object-fit:contain; display:block; margin:0 auto; filter:drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
   #reportOverlay .seg{ flex-wrap:wrap; }
   .act-stats{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin:6px 0; text-align:center; }
@@ -2140,10 +2142,38 @@ function dnaFactions(){ return Object.keys(FACTIONS).concat(dragonUnlocked() ? [
 // สุ่ม "แพ็ค DNA" — สุ่มทั้งเกรดและ "เผ่าหลัก" ทันทีตอนสุ่มได้เลย (ไม่รอจนติดตั้ง)
 function rollDNAPackage(weightKey){
   const grade = weightedPick(weightKey);
-  return { id:newId(), grade, primaryFaction:gachaFaction(), createdAt:Date.now() };
+  const pkg = { id:newId(), grade, primaryFaction:gachaFaction(), createdAt:Date.now() }; dnaPkgPre(pkg); return pkg;
 }
 function makeDNAPackageFixedGrade(grade){
-  return { id:newId(), grade, primaryFaction:gachaFaction(), createdAt:Date.now() };
+  const pkg = { id:newId(), grade, primaryFaction:gachaFaction(), createdAt:Date.now() }; dnaPkgPre(pkg); return pkg;
+}
+// 🔒 ล็อกผลสุ่มของแพ็ค DNA ไว้ตั้งแต่ได้แพ็ค (ช่องสุ่มรู้ผลก่อนติดตั้ง · ขาย/บริจาคแล้วผลติดไปด้วย · กดยกเลิกแล้วสุ่มใหม่ไม่ได้)
+//   pkg.pre = [{ t:ชนิดช่อง, f:เผ่า (ถ้ามี), id:DNA ที่สุ่มได้ (เฉพาะช่องสุ่ม) }]
+function dnaPkgPre(pkg){
+  if(!pkg || !DNA_SLOT_CONFIG[pkg.grade]) return [];
+  const cfg = DNA_SLOT_CONFIG[pkg.grade];
+  if(Array.isArray(pkg.pre) && pkg.pre.length===cfg.length && pkg.pre.every((x,i)=>x && x.t===cfg[i])) return pkg.pre;
+  pkg.pre = cfg.map(t=>{
+    if(t==='randomPrimary'){ const d = rollRandomDNA(pkg.primaryFaction); return { t, f:d.faction, id:d.id }; }
+    if(t==='randomOtherRolled'){ const d = rollRandomDNA(randomOtherFaction(pkg.primaryFaction)); return { t, f:d.faction, id:d.id }; }
+    if(t==='randomFree'){ const d = rollRandomDNA(gachaFaction()); return { t, f:d.faction, id:d.id }; }
+    if(t==='chooseOtherRolled') return { t, f:randomOtherFaction(pkg.primaryFaction) };
+    return { t };
+  });
+  return pkg.pre;
+}
+function dnaDefOf(f, id){ return ((DNA_DEFS[f]||[]).find(d=>d.id===id)) || null; }
+// รายละเอียดช่อง DNA ของแพ็ค (ใช้ในตลาด/คลังกิล/หน้า DNA)
+function dnaPreHtml(pkg){
+  const pre = Array.isArray(pkg && pkg.pre) ? pkg.pre : null;
+  if(!pre) return `<div class="note" style="margin:2px 0 0;">${describeDNAConfig(pkg.grade)} · ผลสุ่มจะล็อกเมื่อเจ้าของเปิดดู</div>`;
+  const pf = pkg.primaryFaction;
+  return `<div class="dna-pre">${pre.map((x,i)=>{
+    const F = f=> f && FACTIONS[f] ? `${FACTIONS[f].icon}${FACTIONS[f].name}` : '';
+    if(x.id){ const d = dnaDefOf(x.f, x.id); return `<div>🎲 ช่อง ${i+1}: <b>${F(x.f)} ${esc(d ? d.name : x.id)}</b>${d && d.desc ? ` <span class="note" style="margin:0;">— ${esc(d.desc)}</span>` : ''}</div>`; }
+    const what = x.t==='choosePrimary' ? `เลือกเองในเผ่า ${F(pf)}` : x.t==='chooseOtherRolled' ? `เลือกเองในเผ่า ${F(x.f)}` : x.t==='chooseOtherFree' ? 'เลือกเผ่าอื่น + DNA เอง' : 'เลือกเผ่า + DNA เองอิสระ';
+    return `<div>✋ ช่อง ${i+1}: ${what}</div>`;
+  }).join('')}</div>`;
 }
 
 // ชนิด slot DNA ต่อเกรด (เผ่าหลัก = เผ่าที่สุ่มได้ตอน roll แพ็ค):
@@ -3258,7 +3288,7 @@ function renderAll(){ renderHud(); renderRoster(); renderBag(); renderDNATab(); 
 function dnaPkgCardHtml(pkg){
   return `<div class="part-pick-item">
     ${artImgHtml('dna_'+pkg.grade, 'gear-ic')}<div style="flex:1;min-width:0;"><b style="color:${GRADES[pkg.grade].color}">${pkg.grade}</b> DNA — เผ่าหลัก ${FACTIONS[pkg.primaryFaction].icon} ${FACTIONS[pkg.primaryFaction].name}
-      <div class="note" style="margin-top:2px;">${describeDNAConfig(pkg.grade)}</div>
+      ${dnaPreHtml(pkg)}
     </div>
     <button class="primary" onclick="openDNAInstallPicker('${pkg.id}')">ติดตั้ง</button>
   </div>`;
@@ -3267,6 +3297,7 @@ function renderDNATab(){
   const pkgList = document.getElementById('dnaPkgList');
   const pkgCount = document.getElementById('dnaPkgCount');
   if(!pkgList) return;
+  { let changed = false; dnaPackages.forEach(p=>{ if(!Array.isArray(p.pre)){ dnaPkgPre(p); changed = true; } }); if(changed) saveDNAPackages(); }
   pkgCount.textContent = dnaPackages.length;
   pkgList.innerHTML = dnaPackages.length===0
     ? `<div class="empty-msg">ยังไม่มี DNA ที่รอติดตั้ง ไปสุ่มที่แท็บ 🥚 ดูสิ</div>`
@@ -3366,11 +3397,13 @@ function startDNACompose(pkgId, charId){
   const ch = roster.find(r=>r.id===charId);
   if(!pkg || !ch) return;
   const primaryFaction = pkg.primaryFaction;
-  const slots = DNA_SLOT_CONFIG[pkg.grade].map(type=>{
-    if(type==='randomPrimary') return { type, resolved: rollRandomDNA(primaryFaction) };
-    if(type==='randomOtherRolled'){ const f=randomOtherFaction(primaryFaction); return { type, otherFaction:f, resolved: rollRandomDNA(f) }; }
-    if(type==='randomFree'){ const f=gachaFaction(); return { type, otherFaction:f, resolved: rollRandomDNA(f) }; }
-    if(type==='chooseOtherRolled'){ const f=randomOtherFaction(primaryFaction); return { type, otherFaction:f, resolved:null }; }
+  const hadPre = Array.isArray(pkg.pre);
+  const pre = dnaPkgPre(pkg);   // ใช้ผลสุ่มที่ล็อกไว้ในแพ็ค
+  if(!hadPre) saveDNAPackages();
+  const slots = pre.map(x=>{
+    const type = x.t;
+    if(x.id){ const d = dnaDefOf(x.f, x.id) || rollRandomDNA(x.f); return { type, otherFaction:x.f, resolved:{ ...d, faction:x.f } }; }
+    if(type==='chooseOtherRolled') return { type, otherFaction:x.f, resolved:null };
     return { type, faction:null, resolved:null };   // choosePrimary / chooseOtherFree / chooseFree
   });
   dnaCompose = { pkgId, charId, primaryFaction, slots };
@@ -5508,7 +5541,19 @@ const GUILD_UPGRADES = {
   def:   { icon:'🛡️', label:'ป้องกันในเขตกิล',     per:0.3, max:40,       base:100,  fmt:v=>`DEF +${v}` },
   drop:  { icon:'✨', label:'อัตราดรอป',           per:0.2, max:20,       base:1000, fmt:v=>`+${v}% โอกาสได้ของเพิ่ม 1 กลุ่ม` },
   exp:   { icon:'📖', label:'EXP ตัวละคร',         per:10,  max:100,      base:1000, fmt:v=>`EXP +${v}%` },
+  flagSpd:{ icon:'⏱️', label:'สร้างธงเร็วขึ้น',      per:10,  max:50,       base:300,  fmt:v=>`เวลาสร้างธง −${v}%` },
+  flagCap:{ icon:'🚩', label:'ธงเพิ่ม',              per:3,   max:30,       base:200,  fmt:v=>`ธง +${v} ผืน` },
+  radar: { icon:'📡', label:'เรดาร์เขตกิล',          per:1,   max:1,        base:1000, fmt:v=>v?'แจ้งพิกัดบอส/ทหาร/ผู้บุกรุกในเขตธง':'ปิด' },
+  camp2: { icon:'⛺', label:'ค่ายกิลที่ 2',           per:1,   max:1,        base:1000, req:{ level:10 }, fmt:v=>v?'ตั้งค่ายได้ 2 จุด':'ตั้งได้ 1 จุด' },
+  ally:  { icon:'🤝', label:'พันธมิตร',              per:1,   max:1,        base:1000, fmt:v=>v?'ผูกพันธมิตรได้ 1 กิล':'ยังผูกไม่ได้' },
+  step:  { icon:'👣', label:'ก้าวเบาในเขตกิล',        per:3,   max:30,       base:300,  fmt:v=>`โอกาสเดินไม่เสียสเตมิน่า ${v}%` },
 };
+// ค่าจากชีทตั้งค่า (gu_<ชื่อ>_base / _per / _max) ทับค่าเริ่มต้นของอัปเกรดใหม่
+function guildUpgApplyCfg(){
+  if(typeof GCFG==='undefined' || !GCFG.set) return;
+  ['flagSpd','flagCap','radar','camp2','ally','step'].forEach(k=>{ const d = GUILD_UPGRADES[k]; ['base','per','max'].forEach(f=>{ const v = GCFG.set['gu_'+k+'_'+f]; if(v!=null && v!=='' && isFinite(Number(v))) d[f] = Number(v); }); });
+}
+function guildUpgLv(stat){ const t = guildState && guildState.treasury; return guildUpgValue(stat, (t && t.upg && t.upg[stat]) || 0); }
 function guildUpgValue(stat, n){ const d = GUILD_UPGRADES[stat]; return Math.min(d.max, Math.round(n*d.per*100)/100); }
 function guildUpgMaxed(stat, n){ const d = GUILD_UPGRADES[stat]; return d.max!==Infinity && n*d.per >= d.max - 1e-9; }
 function guildUpgCost(stat, n){ return Math.round(GUILD_UPGRADES[stat].base * Math.pow(GUILD_UPG_GROWTH, n)); }
@@ -5975,7 +6020,7 @@ function guildTreasuryBrowserHtml(t, myPts, shopHtml){
   // รวมของเหมือนกันเป็นกองเดียว (เช่น ขาซ้าย อสูร C x4) กดแลกทีละชิ้น
   const groups = {};
   list.forEach(o=>{
-    const key = [o.kind, o.slot||'', o.faction||'', o.primaryFaction||'', o.grade||'', o.itemId||'', o.qty||'', o.name||''].join('|');
+    const key = [o.kind, o.slot||'', o.faction||'', o.primaryFaction||'', o.grade||'', o.itemId||'', o.qty||'', o.name||'', o.pre ? JSON.stringify(o.pre) : ''].join('|');
     const gr = (groups[key] = groups[key] || { o, oids:[], minTs:Infinity });
     gr.oids.push(o.oid); gr.minTs = Math.min(gr.minTs, o._ts||Date.now());
   });
@@ -5987,7 +6032,7 @@ function guildTreasuryBrowserHtml(t, myPts, shopHtml){
     const left = fmtLeft(minTs + GUILD_OBJ_TTL_MS - Date.now());
     const im = guildObjImgHtml(o);
     return `<div class="part-pick-item">${im}<div style="flex:1;min-width:0;">${im?'':guildObjIcon(o)+' '}${o.grade?`<b style="color:${(GRADES[o.grade]||{}).color||'inherit'}">${esc(o.grade)}</b> `:''}${esc(guildObjName(o))}
-        ${oids.length>1?`<b style="color:var(--accent)"> x${oids.length}</b>`:''}<div class="note" style="margin:0;">${c} แต้ม / ชิ้น · ⏳ ${left}</div></div>
+        ${oids.length>1?`<b style="color:var(--accent)"> x${oids.length}</b>`:''}${o.kind==='dna' ? dnaPreHtml(o) : ''}<div class="note" style="margin:0;">${c} แต้ม / ชิ้น · ⏳ ${left}</div></div>
       <button class="primary" ${myPts>=c?'':'disabled'} onclick="redeemGuildObj('${esc(oids[0])}')">แลก</button></div>`;
   }).join('');
 }
@@ -6001,6 +6046,7 @@ async function guildUpgrade(stat){
   const { treasury } = await loadLedger(profile.guildId);   // เช็คจากข้อมูลล่าสุด
   const n = treasury.upg[stat]||0;
   if(guildUpgMaxed(stat, n)){ showToast('อัปเกรดนี้เต็มแล้ว'); return; }
+  const rq = GUILD_UPGRADES[stat].req; if(rq && rq.level && 1 + (treasury.upg.level||0) < rq.level){ showToast(`ต้องอัปเลเวลกิลถึง ${rq.level} ก่อน`); return; }
   const cost = guildUpgCost(stat, n);
   if(treasury.exp < cost){ showToast(`EXP กิลไม่พอ (มี ${treasury.exp.toLocaleString()}/${cost.toLocaleString()})`); return; }
   const d = GUILD_UPGRADES[stat];
@@ -6032,6 +6078,7 @@ function fmtLeft(ms){
   return d>0 ? `${d}ว ${h%24}ชม.` : h>0 ? `${h}ชม. ${Math.floor(ms%3600000/60000)}น.` : `${Math.max(1,Math.floor(ms/60000))} นาที`;
 }
 function guildUpgradePanelHtml(t){
+  guildUpgApplyCfg();
   const can = canManageGuild();
   const rows = Object.entries(GUILD_UPGRADES).map(([k,d])=>{
     const n = t.upg[k]||0, maxed = guildUpgMaxed(k, n), cost = guildUpgCost(k, n);
@@ -6039,7 +6086,7 @@ function guildUpgradePanelHtml(t){
     const next = maxed ? 'เต็มแล้ว' : `ถัดไป: ${d.fmt(guildUpgValue(k, n+1))} · ${cost.toLocaleString()} EXP`;
     return `<div class="part-pick-item"><div>${d.icon} <b>${d.label}</b> <span class="note">${d.max!==Infinity?`(สูงสุด ${d.fmt(d.max)})`:''}</span>
         <div class="note" style="margin:0;">${now}</div><div class="note" style="margin:0;color:var(--accent);">${next}</div></div>
-      ${can ? `<button class="primary" ${!maxed && t.exp>=cost ? '' : 'disabled'} onclick="guildUpgrade('${k}')">อัป</button>` : ''}</div>`;
+      ${d.req && d.req.level && 1+(t.upg.level||0) < d.req.level ? `<span class="note" style="margin:0;">🔒 กิล Lv.${d.req.level}</span>` : can ? `<button class="primary" ${!maxed && t.exp>=cost ? '' : 'disabled'} onclick="guildUpgrade('${k}')">อัป</button>` : ''}</div>`;
   }).join('');
   return `<div class="panel">
       <h2>📈 พัฒนากิล</h2>
@@ -6047,7 +6094,57 @@ function guildUpgradePanelHtml(t){
       <div class="note">EXP กิลได้จากของในคลังที่อยู่เกิน 3 วัน (หายไปกลายเป็น EXP เท่าราคาแต้มของชิ้นนั้น) · ค่าอัปครั้งถัดไป x${GUILD_UPG_GROWTH}
         · โจมตี/หลบ/ป้องกัน ใช้ตอนสู้ในโซนที่กิลเราครอง · ดรอป/EXP ใช้ทุกด่าน${can?'':' · <b>เฉพาะหัวกิล/รองกิลกดอัปได้</b>'}</div>
       <div style="margin-top:6px;">${rows}</div>
+      ${can ? `<div class="part-pick-item" style="flex-wrap:wrap;gap:6px;margin-top:8px;">
+        <div style="flex:1 1 100%;">🔄 <b>แลกเพชร/เหรียญในคลังกิล → EXP กิล</b>
+          <div class="note" style="margin:0;">${gconvRate('dia').toLocaleString()}💎 = 1 EXP · ${gconvRate('coin').toLocaleString()}🪙 = 1 EXP · คลังกิลมี 💎 ${Math.floor(t.dia||0).toLocaleString()} · 🪙 ${Math.floor(t.coin||0).toLocaleString()} (หัวกิล/รองกิลเท่านั้น)</div></div>
+        <input type="text" inputmode="numeric" id="gconvDia" placeholder="เพชร" style="width:90px;">
+        <input type="text" inputmode="numeric" id="gconvCoin" placeholder="เหรียญ" style="width:110px;">
+        <button class="primary" onclick="guildConvertExp()">แลกเป็น EXP</button></div>` : ''}
     </div>`;
+}
+function guildAllyPanelHtml(t){
+  const me = TERR.me; if(!me || !guildState.guild) return '';
+  const lv = (t.upg.ally||0) >= 1, can = canManageGuild();
+  if(!lv && !me.ally) return '';
+  let body;
+  if(me.ally) body = `<div class="statline"><span>พันธมิตร</span><span style="color:var(--accent);font-weight:800;">🤝 ${esc(me.ally.name)}</span></div>
+      <div class="note">ไม่ดักกันในแผนที่ · ตีธง/ค่าย/เมืองหลวงของกันไม่ได้ · ปักธงต่อจากธงพันธมิตรได้ · ก้าวเบาใช้ในเขตพันธมิตรได้</div>
+      ${can ? `<button class="ghost" onclick="allyDo('break')">💔 เลิกเป็นพันธมิตร (ผูกใหม่ได้ใน 7 วัน)</button>` : ''}`;
+  else {
+    const cool = (me.allyBrk||0) + 7*86400000 - terrNow();
+    body = `${(me.allyIn||[]).map(r=>`<div class="part-pick-item"><div>📨 กิล <b>${esc(r.name)}</b> ขอเป็นพันธมิตร</div>${can?`<button class="primary" onclick="allyDo('accept','${esc(r.gid)}')">ยอมรับ</button><button class="ghost" onclick="allyDo('reject','${esc(r.gid)}')">ปฏิเสธ</button>`:''}</div>`).join('')}
+      ${me.allyReq ? `<div class="part-pick-item"><div>⏳ ส่งคำขอถึงกิล <b>${esc(me.allyReq.name)}</b> แล้ว รออีกกิลยอมรับ</div>${can?`<button class="ghost" onclick="allyDo('cancel')">ยกเลิก</button>`:''}</div>` : ''}
+      ${cool > 0 ? `<div class="note">เพิ่งเลิกพันธมิตร ผูกใหม่ได้ในอีก ${Math.ceil(cool/86400000)} วัน</div>` : (can && !me.allyReq ? `<div class="row" style="margin-top:6px;"><input type="text" id="allyNameInput" placeholder="ชื่อกิลที่จะขอเป็นพันธมิตร"><button class="primary" style="flex:0 0 auto;" onclick="allyDo('request')">ส่งคำขอ</button></div>` : '')}
+      <div class="note">อีกกิลต้องอัป 🤝 พันธมิตร ด้วย และหัวกิล/รองกิลต้องกดยอมรับ · มีพันธมิตรได้ 1 กิล</div>`;
+  }
+  return `<div class="panel"><h2>🤝 พันธมิตร</h2>${body}</div>`;
+}
+async function allyDo(op, gid){
+  if(!canManageGuild()){ showToast('เฉพาะหัวกิล/รองกิล'); return; }
+  const name = op==='request' ? ((document.getElementById('allyNameInput')||{}).value||'').trim() : '';
+  if(op==='request' && !name){ showToast('ใส่ชื่อกิลก่อน'); return; }
+  if(op==='break' && !confirm('เลิกเป็นพันธมิตร? (ผูกพันธมิตรใหม่ได้หลัง 7 วัน)')) return;
+  let r; try{ r = await onlineRpc({ a:'ally', t:ON.token, op, name, gid }); }catch(e){ r = { ok:false, error:'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้' }; }
+  if(!r || !r.ok){ showToast((r&&r.error)||'ไม่สำเร็จ'); return; }
+  terrApply(r); showToast(r.msg||'สำเร็จ');
+  if(typeof renderGuildTab==='function') renderGuildTab();
+}
+function gconvRate(kind){ const k = kind==='dia' ? 'gconv_dia_per' : 'gconv_coin_per'; const v = GCFG && GCFG.set && Number(GCFG.set[k]); return v > 0 ? v : (kind==='dia' ? 20 : 10000); }
+async function guildConvertExp(){
+  if(!guildState.guild || !canManageGuild()){ showToast('เฉพาะหัวกิล/รองกิล'); return; }
+  const n = id=> Math.max(0, Math.floor(Number((document.getElementById(id)||{}).value)||0));
+  let dia = n('gconvDia'), coin = n('gconvCoin');
+  const dPer = gconvRate('dia'), cPer = gconvRate('coin');
+  dia -= dia % dPer; coin -= coin % cPer;   // ใช้เฉพาะจำนวนที่หารลงตัว
+  const gexp = dia/dPer + coin/cPer;
+  if(gexp <= 0){ showToast(`ใส่อย่างน้อย ${dPer}💎 หรือ ${cPer.toLocaleString()}🪙`); return; }
+  const { treasury } = await loadLedger(profile.guildId);
+  if(dia > treasury.dia || coin > treasury.coin){ showToast(`คลังกิลไม่พอ (มี 💎 ${Math.floor(treasury.dia)} · 🪙 ${Math.floor(treasury.coin).toLocaleString()})`); return; }
+  if(!confirm(`แลก ${dia?dia.toLocaleString()+'💎 ':''}${coin?coin.toLocaleString()+'🪙 ':''}จากคลังกิล เป็น EXP กิล +${gexp.toLocaleString()}?`)) return;
+  const ok = await addLedger(profile.guildId, { t:'convert', pid:profile.playerId, name:profile.playerName, dia:-dia, coin:-coin, gexp });
+  if(!ok){ showToast('แลกไม่สำเร็จ'); return; }
+  await refreshGuildData(true);
+  showToast(`🔄 แลกสำเร็จ! EXP กิล +${gexp.toLocaleString()}`);
 }
 
 function gearStatText(g){
@@ -6180,7 +6277,7 @@ async function donateDNAToGuild(pkgId){
   const pkg = dnaPackages.find(x=>x.id===pkgId);
   if(!pkg) return;
   const pts = GUILD_DNA_DONATE_PTS[pkg.grade] || 5;
-  const obj = { oid:'o'+rid(), kind:'dna', grade:pkg.grade, primaryFaction:pkg.primaryFaction };
+  const obj = { oid:'o'+rid(), kind:'dna', grade:pkg.grade, primaryFaction:pkg.primaryFaction, pre:dnaPkgPre(pkg) };
   if(!confirm(`บริจาค ${guildObjName(obj)} เข้าคลังกิล? ได้ ${pts} แต้มกิล`)) return;
   dnaPackages = dnaPackages.filter(x=>x.id!==pkgId);
   if(!(await addLedger(profile.guildId, { t:'donate', pid:profile.playerId, name:profile.playerName, pts, obj }))){
@@ -6226,7 +6323,7 @@ async function redeemGuildObj(oid){
   if(!ok){ showToast('แลกไม่สำเร็จ ลองใหม่อีกครั้ง'); return; }
   const { oid:_o, kind, ...data } = o;
   if(kind==='part'){ parts.push({ id:newId(), slot:data.slot, faction:data.faction, grade:data.grade, equippedTo:null }); await saveParts(); }
-  else if(kind==='dna'){ dnaPackages.push({ id:newId(), grade:data.grade, primaryFaction:data.primaryFaction, createdAt:Date.now() }); await saveDNAPackages(); }
+  else if(kind==='dna'){ const np = { id:newId(), grade:data.grade, primaryFaction:data.primaryFaction, createdAt:Date.now() }; if(Array.isArray(data.pre)) np.pre = data.pre; dnaPkgPre(np); dnaPackages.push(np); await saveDNAPackages(); }
   else if(kind==='gear'){ equipment.push({ ...data, id:newId(), equippedTo:null }); await saveEquipment(); }
   else { addItem(data.itemId, data.qty||1); await saveBagItems(); await saveWarehouseItems(); }
   renderAll();
@@ -6486,12 +6583,12 @@ function renderMyGuildPanel(){
   const objHtml = guildTreasuryBrowserHtml(t, myPts, shopHtml);
   const myParts = parts.filter(p=>!p.equippedTo).sort((a,b)=> GRADE_ORDER.indexOf(b.grade)-GRADE_ORDER.indexOf(a.grade));
   const donatePartsHtml = myParts.length
-    ? myParts.map(p=>`<div class="part-pick-item"><div><b style="color:${GRADES[p.grade].color}">${p.grade}</b> ${FACTIONS[p.faction].icon} ${FACTIONS[p.faction].name} · ${PART_SLOT_LABEL[p.slot]}</div>
+    ? myParts.map(p=>`<div class="part-pick-item">${artImgHtml('pt_'+p.slot+'_'+p.faction, 'gear-ic')}<div style="flex:1;min-width:0;"><b style="color:${GRADES[p.grade].color}">${p.grade}</b> ${FACTIONS[p.faction].name} · ${PART_SLOT_LABEL[p.slot]}</div>
         <button onclick="donatePartToGuild('${p.id}')">บริจาค +${GUILD_PART_DONATE_PTS[p.grade]||1} แต้ม</button></div>`).join('')
     : `<div class="note">ไม่มีชิ้นส่วนที่ว่างอยู่ (ชิ้นที่ใส่อยู่ต้องถอดก่อน)</div>`;
   const myDna = [...dnaPackages].sort((a,b)=> GRADE_ORDER.indexOf(b.grade)-GRADE_ORDER.indexOf(a.grade));
   const donateDnaHtml = myDna.length
-    ? myDna.map(d=>`<div class="part-pick-item"><div><b style="color:${GRADES[d.grade].color}">${d.grade}</b> 🧬 แพ็ค DNA · เผ่าหลัก ${(FACTIONS[d.primaryFaction]||{}).name||'-'}</div>
+    ? myDna.map(d=>`<div class="part-pick-item">${artImgHtml('dna_'+d.grade, 'gear-ic')}<div style="flex:1;min-width:0;"><b style="color:${GRADES[d.grade].color}">${d.grade}</b> แพ็ค DNA · เผ่าหลัก ${(FACTIONS[d.primaryFaction]||{}).name||'-'}${dnaPreHtml(d)}</div>
         <button onclick="donateDNAToGuild('${d.id}')">บริจาค +${GUILD_DNA_DONATE_PTS[d.grade]||5} แต้ม</button></div>`).join('')
     : `<div class="note">ไม่มีแพ็ค DNA ที่ยังไม่ได้ติดตั้ง</div>`;
   return `<div class="panel">
@@ -6515,6 +6612,7 @@ function renderMyGuildPanel(){
       <div style="margin-top:8px;">${objHtml}</div>
     </div>
     ${guildUpgradePanelHtml(t)}
+    ${guildAllyPanelHtml(t)}
     <div class="panel">
       <h2>🎁 บริจาคเข้ากิล</h2>
       <div class="note" style="margin:0 0 4px;color:var(--accent);">📖 บริจาคแล้วได้ EXP กิลด้วย: ${cfgSet('gd_exp_dia_per')||10}💎 / ${(cfgSet('gd_exp_coin_per')||5000).toLocaleString()}🪙 / ปูน+เหล็กเส้น ${cfgSet('gd_exp_mat_per')||20} ชิ้น = EXP กิล 1 · สูงสุด ${cfgSet('gd_exp_daily_cap')||30} EXP ต่อคนต่อวัน · 🚩 ธงให้ EXP กิลทุกวัน: โซน1 ${cfgSet('terr_exp_hospital')} · โซน2 ${cfgSet('terr_exp_school')} · โซน3 ${cfgSet('terr_exp_campground')} · โซน4 ${cfgSet('terr_exp_ruins')} · โซน5 ${cfgSet('terr_exp_deadland')} ต่อธง/วัน</div>
@@ -7098,7 +7196,7 @@ function renderP2PMarket(){
   else {
     const rows = mkt.list.filter(x=>(mkt.cat==='all'||x.cat===mkt.cat) && (!mkt.mineOnly||x.mine));
     body = rows.length ? rows.map(x=>`<div class="part-pick-item">
-        ${mktItemImg(x.item)}<div style="flex:1;min-width:0;">${mktItemLabel(x.item, !!mktItemImg(x.item))}<div class="note" style="margin:2px 0 0;">ผู้ขาย ${esc(x.sn)}${x.mine?' (คุณ)':''}</div></div>
+        ${mktItemImg(x.item)}<div style="flex:1;min-width:0;">${mktItemLabel(x.item, !!mktItemImg(x.item))}${x.item && x.item.kind==='dna' && x.item.pkg ? dnaPreHtml(x.item.pkg) : ''}<div class="note" style="margin:2px 0 0;">ผู้ขาย ${esc(x.sn)}${x.mine?' (คุณ)':''}</div></div>
         ${x.mine ? `<button class="ghost" onclick="mktCancel('${x.id}')">ยกเลิก · ${x.price}💎</button>`
                  : `<button class="diamond" onclick="mktBuy('${x.id}', ${x.price})" ${(!allowed||profile.diamonds<x.price)?'disabled':''}>ซื้อ · ${x.price.toLocaleString()}💎</button>`}
       </div>`).join('') : `<div class="empty-msg">ยังไม่มีสินค้าในหมวดนี้</div>`;
@@ -7166,7 +7264,8 @@ function mktSellables(){
   pushItems(bagItems,'bag'); pushItems(warehouseItems,'wh');
   parts.filter(p=>!p.equippedTo).forEach(p=> out.push({ key:'p:'+p.id, cat:'part', label:mktItemLabel({kind:'part', part:p}), max:1 }));
   equipment.filter(g=>!g.equippedTo).forEach(g=> out.push({ key:'g:'+g.id, cat:'gear', label:mktItemLabel({kind:'gear', gear:g}), max:1 }));
-  dnaPackages.forEach(d=> out.push({ key:'d:'+d.id, cat:'dna', label:mktItemLabel({kind:'dna', pkg:d}), max:1 }));
+  { let ch = false; dnaPackages.forEach(d=>{ if(!Array.isArray(d.pre)){ dnaPkgPre(d); ch = true; } }); if(ch) saveDNAPackages(); }
+  dnaPackages.forEach(d=> out.push({ key:'d:'+d.id, cat:'dna', label:mktItemLabel({kind:'dna', pkg:d}) + dnaPreHtml(d), max:1 }));
   return out;
 }
 let mktSellCat = 'all';
@@ -8648,7 +8747,10 @@ async function mapStep(dx, dy){
   if(mapIsCity(x,y) && typeof isRed==='function' && isRed()){ showToast('🟥 ตัวแดงเข้าเมืองไม่ได้ — รอหายแดงตอนเที่ยงคืน'); return; }
   if(!profile.lockedTeamIds){ showToast('ต้องเลือกทีม 2 ตัวแล้วกด "ยืนยันทีม" ด้านล่างแผนที่ก่อนเดิน'); renderMapPanel(); try{ document.getElementById('battleSetup').scrollIntoView({behavior:'smooth'}); }catch(e){} return; }
   const toCity = mapIsCity(x,y);
-  const stepCost = (DEV.on && DEV.freeWalk) ? 0 : MAP_STEP_STAMINA;
+  let stepCost = (DEV.on && DEV.freeWalk) ? 0 : MAP_STEP_STAMINA;
+  // 👣 ก้าวเบาในเขตกิล (อัปเกรดกิล): เดินเข้าเขตธงกิลตัวเอง/พันธมิตร มีโอกาสไม่เสียสเตมิน่า
+  let lightStep = false;
+  if(stepCost && !toCity && TERR.me && TERR.me.step > 0 && terrNearOwnOrAlly(x,y) && profile.stamina >= stepCost && Math.random()*100 < TERR.me.step){ stepCost = 0; lightStep = true; }
   if(profile.stamina < stepCost){ showToast('สเตมิน่าหมด — ใช้เสบียงหรือรอฟื้น (1 หน่วย / 2 นาที)'); return; }
   if(!toCity && !mapTeamAlive()){ showToast('ทีมหมดเลือด — ใช้น้ำยาเพิ่มเลือดก่อน'); return; }
   if(mapQLen >= 6){ showToast('⏳ รอซิงก์กับเซิร์ฟเวอร์สักครู่…'); return; }
@@ -8662,7 +8764,8 @@ async function mapStep(dx, dy){
   if(profile.veteranUntil) profile.veteranUntil = 0;
   if(profile.mapRadar && !(profile.mapRadar.until > Date.now())) profile.mapRadar = null;   // 📡 เรดาห์หมดเวลา (1 นาที)
   saveProfile(); renderHud();
-  if(wasTown && !toCity) showToast('🚶 ออกจากเมือง — นอกเมืองใช้ได้แค่ของในกระเป๋า');
+  if(wasTown && !toCity) showToast('🚶 ออกจากเมือง — นอกเมืองใช้ได้แค่ของในกระเป๋า' + (lightStep ? ' · 👣 ก้าวเบา ไม่เสียสเตมิน่า' : ''));
+  else if(lightStep) showToast('👣 ก้าวเบา ไม่เสียสเตมิน่า');
   if(toCity){ mapHints = { howl:false, car:false }; showToast(`${MAP_CITY_INFO[z].icon} เข้าเมือง${MAP_CITY_INFO[z].name} — จุดเกิดใหม่ถูกบันทึกแล้ว`); }
   // ส่งตำแหน่งไปเซิร์ฟเวอร์ตามหลัง (ตรวจ PVP/บอส/ทหารผ่านศึก)
   if(online){
@@ -8808,8 +8911,10 @@ var CAP = null;   // 🏯 สถานะเมืองหลวง (จาก�
 const TERR = { list:[], map:{}, me:null, cfg:{}, ts:0 };
 let terrBattle = null;
 let pvpChain = null;   // เจอผู้เล่นหลายคนในช่องเดียว: { list:[{attackId,target}], idx, z, cell }   // การตีธงที่มีคนป้องกัน: { id, x, y, defs:[], idx, target }
+let terrRadarSeen = {};
 function terrApply(r){
   if(!r || !r.list) return;
+  try{ ((r.me && r.me.radar) || []).forEach(a=>{ const k = a.k+':'+(a.k==='enemy'?a.n:a.z+':'+(a.w||'')); if(!terrRadarSeen[k]){ terrRadarSeen[k] = 1; showToast(`📡 เรดาร์: ${a.k==='boss'?'👹 บอสโซน':a.k==='vet'?'🎖️':'⚠️ ผู้บุกรุก'} ${a.n} อยู่ที่ ${mapCoord(a.x,a.y)} ในเขตธงกิล`); } }); }catch(e){}
   TERR.list = r.list; TERR.map = {}; r.list.forEach(f=>{ TERR.map[f.x+','+f.y] = f; });
   TERR.me = r.me || null; TERR.cfg = r.cfg || TERR.cfg; TERR.ts = Date.now();
   TERR.skew = r.now ? r.now - Date.now() : 0;
@@ -8821,7 +8926,11 @@ function terrDone(f){ return f && (f.done||0) <= terrNow(); }
 function terrMine(f){ return !!(f && TERR.me && f.g === TERR.me.gid); }
 function terrOwnCell(x,y){ const f = terrAt(x,y); return terrMine(f) && terrDone(f); }
 function terrNearOwn(x,y){ for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++) if(terrOwnCell(x+dx,y+dy)) return true; return false; }   // อยู่ในระยะ 3×3 รอบธง/ค่ายกิลเรา
-function terrAdjOwn(x,y){ return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=> terrOwnCell(x+dx,y+dy)); }
+function terrAllyGid(){ return TERR.me && TERR.me.ally ? TERR.me.ally.gid : null; }
+function terrIsAlly(f){ const a = terrAllyGid(); return !!(f && a && f.g === a); }
+function terrOwnOrAllyCell(x,y){ const f = terrAt(x,y); return (terrMine(f) || terrIsAlly(f)) && terrDone(f); }
+function terrAdjOwn(x,y){ return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=> terrOwnOrAllyCell(x+dx,y+dy)); }   // ปักธง/ตีต่อจากธงพันธมิตรได้
+function terrNearOwnOrAlly(x,y){ for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++) if(terrOwnOrAllyCell(x+dx,y+dy)) return true; return false; }
 function terrColor(gid){ let h = 0; for(const ch of String(gid)) h = (h*31 + ch.charCodeAt(0))>>>0; return `hsl(${h%360},85%,60%)`; }
 function terrMinLeft(t){ return Math.max(1, Math.ceil((t - terrNow())/60000)); }
 async function terrRefresh(){
@@ -8834,23 +8943,32 @@ function terrPanelHtml(p){
   const me = TERR.me, c = TERR.cfg || {};
   const lines = [];
   if(!me){ return `<div class="mterr"><b>🚩 พื้นที่กิล</b><div class="note" style="margin:2px 0 0;">เข้ากิลก่อน ถึงตั้งค่าย/ปักธงยึดพื้นที่ได้</div></div>`; }
-  const head = `<b>🚩 ${esc(me.name)}</b> <span class="note" style="margin:0;">Lv.${me.lv} · ธง ${me.flags}/${me.max} · ค่าย ${me.camp ? mapCoord(me.camp.x,me.camp.y)+(me.camp.done>terrNow()?' (กำลังสร้าง)':'') : '—'}</span>${(me.camp||me.flags) ? guildMatInfoHtml() : ''}`;
+  const camps = me.camps || (me.camp ? [me.camp] : []), campMax = me.campMax || 1, flagMin = me.flagMin != null ? me.flagMin : c.flagMin;
+  const radarHtml = (me.radar||[]).length ? `<div class="mradar">${me.radar.map(a=>`<div>📡 ${a.k==='boss'?'👹 บอสโซน':a.k==='vet'?'🎖️':'⚠️ ผู้บุกรุก'} <b>${esc(a.n)}</b>${a.lv?` Lv.${a.lv}`:''} · <b>${mapCoord(a.x,a.y)}</b></div>`).join('')}</div>` : '';
+  const head = `<b>🚩 ${esc(me.name)}</b> <span class="note" style="margin:0;">Lv.${me.lv} · ธง ${me.flags}/${me.max} · ค่าย ${camps.length ? camps.map(cp=>mapCoord(cp.x,cp.y)+(cp.done>terrNow()?' (กำลังสร้าง)':'')).join(', ') : '—'}${campMax>1?` (${camps.length}/${campMax})`:''}${me.ally?` · 🤝 ${esc(me.ally.name)}`:''}</span>${radarHtml}${(me.camp||me.flags) ? guildMatInfoHtml() : ''}`;
   const f = p.city ? null : terrAt(p.x,p.y);
   const btn = (label, op, cls='ghost', dis=false)=>`<button class="${cls}" ${dis?'disabled':''} onclick="terrDo('${op}')">${label}</button>`;
   if(p.city){
-    if(me.camp && me.camp.done<=terrNow()) lines.push(me.warpAt > terrNow() ? btn(`🌀 วาร์ปไปค่ายกิล (อีก ${terrMinLeft(me.warpAt)} นาที)`,'warp','ghost',true) : btn(`🌀 วาร์ปไปค่ายกิล ${mapCoord(me.camp.x,me.camp.y)}`,'warp','primary'));
+    const doneCamps = camps.filter(cp=>cp.done<=terrNow());
+    if(doneCamps.length > 1) doneCamps.forEach((cp,i)=> lines.push(me.warpAt > terrNow() ? (i ? '' : btn(`🌀 วาร์ปไปค่ายกิล (อีก ${terrMinLeft(me.warpAt)} นาที)`,'warp','ghost',true)) : `<button class="primary" onclick="terrDo('warp',${i})">🌀 วาร์ปไปค่าย ${mapCoord(cp.x,cp.y)}</button>`));
+    else if(me.camp && me.camp.done<=terrNow()) lines.push(me.warpAt > terrNow() ? btn(`🌀 วาร์ปไปค่ายกิล (อีก ${terrMinLeft(me.warpAt)} นาที)`,'warp','ghost',true) : btn(`🌀 วาร์ปไปค่ายกิล ${mapCoord(me.camp.x,me.camp.y)}`,'warp','primary'));
     else lines.push(`<div class="note" style="margin:0;">ออกไปนอกเมืองแล้วตั้งค่ายกิล (ใช้ปูน ${c.campCement} · เหล็กเส้น ${c.campRebar} จากคลังวัสดุกิล) เพื่อเริ่มยึดพื้นที่</div>`);
   } else if(!f){
     if(mapIsRuin(p.x,p.y) || mapIsCapital(p.x,p.y)){}
-    else if(!me.camp && mapZoneOf(p.x,p.y)===DEAD_ZONE) lines.push(`<div class="note" style="margin:0;">💀 โซน 5 ตั้งค่ายกิลไม่ได้ — ตั้งค่ายในโซนอื่นแล้วต่อธงเข้ามา</div>`);
-    else if(!me.camp) lines.push(btn(`⛺ ตั้งค่ายกิลที่นี่ · 🧱${c.campCement} 🔩${c.campRebar} (คลังกิล) · ${c.campMin} นาที`,'camp','primary'));
-    else if(terrAdjOwn(p.x,p.y)) lines.push(btn(`🚩 ปักธงที่นี่ · 🧱${c.flagCement} 🔩${c.flagRebar} (คลังกิล) · ${c.flagMin} นาที`,'flag','primary', me.flags>=me.max));
+    else if(camps.length < campMax && mapZoneOf(p.x,p.y)===DEAD_ZONE && !terrAdjOwn(p.x,p.y)) lines.push(`<div class="note" style="margin:0;">💀 โซน 5 ตั้งค่ายกิลไม่ได้ — ตั้งค่ายในโซนอื่นแล้วต่อธงเข้ามา</div>`);
+    else if(!camps.length) lines.push(btn(`⛺ ตั้งค่ายกิลที่นี่ · 🧱${c.campCement} 🔩${c.campRebar} (คลังกิล) · ${c.campMin} นาที`,'camp','primary'));
+    else if(terrAdjOwn(p.x,p.y)) lines.push(btn(`🚩 ปักธงที่นี่ · 🧱${c.flagCement} 🔩${c.flagRebar} (คลังกิล) · ${flagMin} นาที`,'flag','primary', me.flags>=me.max));
+    else if(camps.length < campMax && mapZoneOf(p.x,p.y)!==DEAD_ZONE){
+      const far = camps.every(cp=> Math.max(Math.abs(cp.x-p.x), Math.abs(cp.y-p.y)) >= (me.camp2Dist||15));
+      lines.push(far ? btn(`⛺ ตั้งค่ายกิลที่ 2 ที่นี่ · 🧱${c.campCement} 🔩${c.campRebar} · ${c.campMin} นาที`,'camp','primary') : `<div class="note" style="margin:0;">⛺ ค่ายที่ 2 ต้องห่างค่ายแรกอย่างน้อย ${me.camp2Dist||15} ช่อง</div>`);
+    }
     else lines.push(`<div class="note" style="margin:0;">ปักธงได้เฉพาะช่องที่ติดกับค่าย/ธงของกิล (บน/ล่าง/ซ้าย/ขวา)</div>`);
   } else {
     const done = terrDone(f), what = f.t==='camp' ? 'ค่ายกิล' : 'ธง';
     const st = !done ? `⏳ กำลังสร้าง เสร็จใน ${terrMinLeft(f.done)} นาที` : `❤️ ${f.hp}/${f.max}${f.hp<=0?' (ไม่มีค่ายคุ้มกัน)':''}${f.imm>terrNow()&&f.hp>0?` · 🛡️ อมตะอีก ${terrMinLeft(f.imm)} นาที`:''}`;
-    lines.push(`<div style="font-size:12px;">${f.t==='camp'?'⛺':'🚩'} ${what}ของ <b style="color:${terrColor(f.g)}">${esc(f.gn)}</b> · ${st}</div>`);
-    if(terrMine(f)){
+    lines.push(`<div style="font-size:12px;">${f.t==='camp'?'⛺':'🚩'} ${what}ของ <b style="color:${terrColor(f.g)}">${esc(f.gn)}</b>${terrIsAlly(f)?' 🤝 พันธมิตร':''} · ${st}</div>`);
+    if(terrIsAlly(f)){ lines.push(`<div class="note" style="margin:0;">🤝 ธงของกิลพันธมิตร — ปักธงต่อจากตรงนี้ได้ ตีไม่ได้</div>`); }
+    else if(terrMine(f)){
       if(done && f.hp<f.max) lines.push(f.rep > terrNow() ? btn(`🔧 ซ่อมได้อีกใน ${terrMinLeft(f.rep)} นาที`,'repair','ghost',true) : btn('🔧 ซ่อม +1','repair','primary'));
       lines.push(btn(`🗑️ รื้อ${what}`,'remove'));
       if(f.t==='camp' && done){
@@ -8866,7 +8984,7 @@ function terrPanelHtml(p){
   }
   return `<div class="mterr">${head}<div class="mterr-act">${lines.join('')}</div></div>`;
 }
-async function terrDo(op){
+async function terrDo(op, ci){
   if(battleActive || !isOnlineMode() || !ON.token) return;
   const c = TERR.cfg || {}, p = mapPos();
   let need = null;
@@ -8881,7 +8999,7 @@ async function terrDo(op){
   if(op==='warpCity' && typeof isRed==='function' && isRed()){ showToast('🟥 ตัวแดงเข้าเมืองไม่ได้'); return; }
   const a = { camp:'terrBuild', flag:'terrBuild', remove:'terrRemove', repair:'terrRepair', warp:'terrWarp', warpCity:'terrWarpCity', attack:'terrAttack' }[op];
   await mapQ;   // รอการเดินที่ค้างอยู่ให้ถึงเซิร์ฟเวอร์ก่อน (ใช้ตำแหน่งบนเซิร์ฟเวอร์)
-  let r; try{ r = await onlineRpc({ a, t:ON.token, kind: op==='camp'?'camp':'flag' }); }catch(e){ r = { ok:false, error:'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้' }; }
+  let r; try{ r = await onlineRpc({ a, t:ON.token, kind: op==='camp'?'camp':'flag', ci: ci||0 }); }catch(e){ r = { ok:false, error:'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้' }; }
   if(!r || !r.ok){ showToast((r&&r.error)||'ไม่สำเร็จ'); terrRefresh(); return; }
   if(r.pos){ profile.mapPos = r.pos; profile.mapVer = MAP_VER; mapHints = { howl:false, car:false }; await saveProfile(); }
   if(r.attackId){ terrStartGauntlet(r); return; }
